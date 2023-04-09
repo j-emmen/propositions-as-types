@@ -54,13 +54,6 @@ module Lambda-Calculus where
   ext M = rename M fs
   -- maps M(1,...,n) to M(2,...,n+1)
 
-  wkn : ∀ {n} → Trm n → Trm (suc n)
-  wkn (var x) = var (fs x)
-  wkn (lam M) = lam (wkn M)
-  -- this is WRONG: lam is binding the variable introduced by wkn
-  wkn (app M₁ M₂) = app (wkn M₁) (wkn M₂)
-
-
   wlift : ∀ {n m} → (Fin n → Trm m) → Fin (suc n) → Trm (suc m)
   wlift f fz = var fz
   wlift f (fs i) = ext (f i)
@@ -143,23 +136,19 @@ module Lambda-Calculus where
   -- maps M(1,...,n) to M(f₁(1,...,m),...,fₙ(1,...,m))
   -- ext M could be subst-all M (var ∘ fs), but need ext to define wlift
 
-  glsect :  ∀ {n} → Trm n → Fin (suc n) → Trm n
-  glsect M fz = M
-  glsect M (fs i) = var i
-
+  -- every term defines a section to the dependent projection (that forgets the first variable)
+  trmsect :  ∀ {n} → Trm n → Fin (suc n) → Trm n
+  trmsect M fz = M
+  trmsect M (fs i) = var i
+  -- to substitute a single term (in the first variable) is to substitute a term section
   subst-0 : ∀ {n} → Trm (suc n) → Trm n → Trm n
-  subst-0 M N = subst-all M (glsect N)
+  subst-0 M N = subst-all M (trmsect N)
 
-  subst : ∀ {n} → Trm (suc n) → Trm n → Trm n
-  subst (var x) N = N
-  subst (lam M) N = lam (subst M (ext N))
-  -- this is WRONG: N is substituted in the variable that should be bound by lam
-  subst (app M₁ M₂) N = app (subst M₁ N) (subst M₂ N) 
 
-  rename-glsect : {n m : Nat}(M : Trm n)(f : Fin n → Fin m)
-                     → ∀ i → glsect (rename M f) (liftFin f i) == rename (glsect M i) f
-  rename-glsect M f fz = =rf {a = rename M f}
-  rename-glsect M f (fs i) = =rf {a = var (f i)}
+  rename-trmsect : {n m : Nat}(M : Trm n)(f : Fin n → Fin m)
+                     → ∀ i → trmsect (rename M f) (liftFin f i) == rename (trmsect M i) f
+  rename-trmsect M f fz = =rf {a = rename M f}
+  rename-trmsect M f (fs i) = =rf {a = var (f i)}
 
   subst-all-rename-sq : {n m k l : Nat}(M : Trm n){f : Fin n → Fin k}{g : Fin k → Trm m}
                         {f' : Fin l → Fin m}{g' : Fin n → Trm l}
@@ -201,8 +190,8 @@ module Lambda-Calculus where
 
   subst-0-rename : {n m : Nat}(M : Trm (suc n))(N : Trm n)(f : Fin n → Fin m)
                       → subst-0 (rename M (liftFin f)) (rename N f) == rename (subst-0 M N) f
-  subst-0-rename M N f = subst-all-rename-sq M {liftFin f} {glsect (rename N f)} {f} {glsect N}
-                                               (rename-glsect N f)
+  subst-0-rename M N f = subst-all-rename-sq M {liftFin f} {trmsect (rename N f)} {f} {trmsect N}
+                                               (rename-trmsect N f)
 
   subst-0-ext : {n : Nat}(M : Trm (suc n))(N : Trm n)
                    → subst-0 (rename M (liftFin fs)) (ext N) == ext (subst-0 M N)
@@ -214,13 +203,13 @@ module Lambda-Calculus where
   wlift-var fz = =rf
   wlift-var (fs i) = =rf
 
-  -- wlift (glsect N) : Fin (suc (suc n)) → Trm (suc n)
-  -- wlift (glsect N) : fz ↦ var fz; fs fz ↦ ext N; fs (fs x) ↦ var (fs x)
+  -- wlift (trmsect N) : Fin (suc (suc n)) → Trm (suc n)
+  -- wlift (trmsect N) : fz ↦ var fz; fs fz ↦ ext N; fs (fs x) ↦ var (fs x)
   -- liftFin fs : fz ↦ fz; fs x ↦ fs (fs x)
-  -- Therefore: wlift (glsect N) ∘ liftFin fs == var
-  wlift-glsect-lift : {n : Nat}(N : Trm n) → ∀ i → wlift (glsect N) (liftFin fs i) == var i
-  wlift-glsect-lift N fz = =rf
-  wlift-glsect-lift N (fs i) = =rf
+  -- Therefore: wlift (trmsect N) ∘ liftFin fs == var
+  wlift-trmsect-lift : {n : Nat}(N : Trm n) → ∀ i → wlift (trmsect N) (liftFin fs i) == var i
+  wlift-trmsect-lift N fz = =rf
+  wlift-trmsect-lift N (fs i) = =rf
 
 
   -- substituting variables is doing nothing
@@ -234,9 +223,9 @@ module Lambda-Calculus where
     =ap₂ app (subst-all-var M₁) (subst-all-var M₂)
   
 
-  subst-all-glsect-lift : {n : Nat}(M : Trm (suc n))(N : Trm n)
-                             → subst-all M (wlift (glsect N) ∘ liftFin fs) == M
-  subst-all-glsect-lift M N = subst-all-ptw M (wlift-glsect-lift N) • subst-all-var M
+  subst-all-trmsect-lift : {n : Nat}(M : Trm (suc n))(N : Trm n)
+                             → subst-all M (wlift (trmsect N) ∘ liftFin fs) == M
+  subst-all-trmsect-lift M N = subst-all-ptw M (wlift-trmsect-lift N) • subst-all-var M
 
 
   -- if family is global section, substitution is left inverse to ext
@@ -245,8 +234,8 @@ module Lambda-Calculus where
     =rf {a = var x}
   subst-0-inext (lam M) N =
     =ap lam (=proof
-      subst-all (rename M (liftFin fs)) (wlift (glsect N))   ==[ subst-all-rename M _ _ ] /
-      subst-all M (wlift (glsect N) ∘ liftFin fs)            ==[ subst-all-glsect-lift M N ]∎
+      subst-all (rename M (liftFin fs)) (wlift (trmsect N))   ==[ subst-all-rename M _ _ ] /
+      subst-all M (wlift (trmsect N) ∘ liftFin fs)            ==[ subst-all-trmsect-lift M N ]∎
       M ∎)
   subst-0-inext (app M₁ M₂) N =
     =ap₂ app (subst-0-inext M₁ N) (subst-0-inext M₂ N)
@@ -308,7 +297,7 @@ module Lambda-Calculus where
 
   subst-0-dist-aux : {n m : Nat}(N : Trm n)(f : Fin n → Trm m)
                        → (i : Fin (suc n))
-                         → subst-all (wlift f i) (glsect (subst-all N f)) == subst-all (glsect N i) f
+                         → subst-all (wlift f i) (trmsect (subst-all N f)) == subst-all (trmsect N i) f
   subst-0-dist-aux N f fz =
     =rf {a = subst-all N f}
   subst-0-dist-aux N f (fs i) =
@@ -317,7 +306,7 @@ module Lambda-Calculus where
   -- substition distributes over substitution in the first variable
   subst-0-dist : {n m : Nat}(M : Trm (suc n))(N : Trm n)(f : Fin n → Trm m)
                     → subst-0 (subst-all M (wlift f)) (subst-all N f) == subst-all (subst-0 M N) f
-  subst-0-dist M N f = subst-all-sq M {wlift f} {glsect (subst-all N f)} {f} {glsect N}
+  subst-0-dist M N f = subst-all-sq M {wlift f} {trmsect (subst-all N f)} {f} {trmsect N}
                                     (subst-0-dist-aux N f)
 
 
@@ -490,10 +479,10 @@ module Lambda-Calculus where
   ⟶-subst-all f {app M N} (βappᵣ redM) =
     βappᵣ (⟶-subst-all f redM)
 
-  ⟶-glsect : {n : Nat}{N N' : Trm n} → N ⟶ N'
-                → ∀ i → glsect N i ⟶⋆ glsect N' i
-  ⟶-glsect stpN fz = ⟶⋆in stpN
-  ⟶-glsect stpN (fs i) = ⟶⋆rfl (var i)
+  ⟶-trmsect : {n : Nat}{N N' : Trm n} → N ⟶ N'
+                → ∀ i → trmsect N i ⟶⋆ trmsect N' i
+  ⟶-trmsect stpN fz = ⟶⋆in stpN
+  ⟶-trmsect stpN (fs i) = ⟶⋆rfl (var i)
 
 
   -- Some congruences of ⟶⋆
@@ -505,10 +494,10 @@ module Lambda-Calculus where
   ⟶⋆-app (tcrfl M) (tccnc redN stpN) = ⟶⋆tr (⟶⋆-app (⟶⋆rfl M) redN) (⟶⋆in (βappᵣ stpN))
   ⟶⋆-app (tccnc redM stpM) redN = ⟶⋆tr (⟶⋆-app redM redN) (⟶⋆in (βappₗ stpM))
 
-  ⟶⋆-glsect : {n : Nat}{N N' : Trm n} → N ⟶⋆ N'
-                → ∀ i → glsect N i ⟶⋆ glsect N' i
-  ⟶⋆-glsect redN fz = redN
-  ⟶⋆-glsect redN (fs i) = ⟶⋆rfl (var i)
+  ⟶⋆-trmsect : {n : Nat}{N N' : Trm n} → N ⟶⋆ N'
+                → ∀ i → trmsect N i ⟶⋆ trmsect N' i
+  ⟶⋆-trmsect redN fz = redN
+  ⟶⋆-trmsect redN (fs i) = ⟶⋆rfl (var i)
 
   -- can use names given by Agda for variables in non-canonical arguments
   -- of inductive definitions (everything within a dot...).
@@ -516,7 +505,7 @@ module Lambda-Calculus where
                  → M ⟶⋆ M' → rename M f ⟶⋆ rename M' f
   ⟶⋆-rename {M = M} {M} f (tcrfl M) =
     ⟶⋆rfl (rename M f)
-  ⟶⋆-rename {M = M} {.(subst-all M₁ (glsect N))} f (tccnc redM (β M₁ N)) =
+  ⟶⋆-rename {M = M} {.(subst-all M₁ (trmsect N))} f (tccnc redM (β M₁ N)) =
     ⟶⋆cnc (⟶⋆-rename f redM)
            (=transp (λ x → app (lam (rename M₁ (liftFin f))) (rename N f) ⟶ x)
                     (subst-0-rename M₁ N f) (β _ _))
@@ -562,7 +551,7 @@ module Lambda-Calculus where
 
   ⟶⋆-subst-0 : {n : Nat}{M M' : Trm (suc n)}{N N' : Trm n} → M ⟶⋆ M' → N ⟶⋆ N'
                     → subst-0 M N ⟶⋆ subst-0 M' N'
-  ⟶⋆-subst-0 redM redN = ⟶⋆-subst-all redM (⟶⋆-glsect redN)
+  ⟶⋆-subst-0 redM redN = ⟶⋆-subst-all redM (⟶⋆-trmsect redN)
 
 
   -- Some congruences of ≡>
@@ -577,10 +566,10 @@ module Lambda-Calculus where
   ≡>-liftFin {f = f} redv (fs i) =
     =transp (λ x → (var (fs (f i)) ≡> var (fs x))) (≡>-var (redv i)) ≡>rfl 
 
-  ≡>-glsect : {n : Nat}{M M' : Trm n} → M ≡> M'
-                 → ∀ i → glsect M i ≡> glsect M' i
-  ≡>-glsect redM fz = redM
-  ≡>-glsect redM (fs i) = ≡>rfl
+  ≡>-trmsect : {n : Nat}{M M' : Trm n} → M ≡> M'
+                 → ∀ i → trmsect M i ≡> trmsect M' i
+  ≡>-trmsect redM fz = redM
+  ≡>-trmsect redM (fs i) = ≡>rfl
 
   -- It seems that Agda does not accet non-canonical terms as explicit arguments
   -- in inductive definitions (which makes sense), but this means that M' and N' cannot be named
@@ -653,7 +642,7 @@ module Lambda-Calculus where
 
   ≡>-subst-0 : {n : Nat}{M M' : Trm (suc n)}{N N' : Trm n} → M ≡> M' → N ≡> N'
                   → subst-0 M N ≡> subst-0 M' N'
-  ≡>-subst-0 {_} {M} red₁ red₂ = ≡>-subst-all red₁ (≡>-glsect red₂)
+  ≡>-subst-0 {_} {M} red₁ red₂ = ≡>-subst-all red₁ (≡>-trmsect red₂)
 
 
   -- order between reduction relations
