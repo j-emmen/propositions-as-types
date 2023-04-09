@@ -310,45 +310,6 @@ module Lambda-Calculus where
                                     (subst-0-dist-aux N f)
 
 
-  -------------------------------------------------------------
-  -- The reflexive and transitive closure of a binary relation
-  -------------------------------------------------------------
-  
-  data trans-clos (R : ∀ {n} → Trm n → Trm n → Set) : ∀ {n} → Trm n → Trm n → Set where
-    --tcin : ∀ {n} → (M N : Trm n) → trans-clos R M N
-    tcrfl : ∀ {n} → (M : Trm n) → trans-clos R M M
-    tccnc : ∀ {n} → {M N L : Trm n} → trans-clos R M N → R N L → trans-clos R M L
-
-  -- the refl-trans closure is transitive
-  rtclos-trans : (R : ∀ {n} → Trm n → Trm n → Set){n : Nat}{M N L : Trm n}
-                    → trans-clos R M N → trans-clos R N L → trans-clos R M L
-  rtclos-trans R {_} {M} {N} red₁ (tcrfl N) = red₁
-  rtclos-trans R red₁ (tccnc red₂ stp) = tccnc (rtclos-trans R red₁ red₂) stp
-
-  -- it contains the orignal relation
-  rtclos-in : (R : ∀ {n} → Trm n → Trm n → Set){n : Nat}{M N : Trm n}
-                    → R M N → trans-clos R M N
-  rtclos-in R {_} {M} r  = tccnc (tcrfl M) r
-
-  -- and it is the minimal such
-  rtclos-min : (R S : ∀ {n} → Trm n → Trm n → Set)
-                  → (∀ {n M} → S {n} M M) → (∀ {n M N L} → S {n} M N → S N L → S M L)
-                    → (∀ {n M N} → R {n} M N → S M N)
-                      → ∀ {n M N} → trans-clos R {n} M N → S M N
-  rtclos-min R S rflS trnS inS {_} {M} (tcrfl M) =
-    rflS {M = M}
-  rtclos-min R S rflS trnS inS (tccnc red r) =
-    trnS (rtclos-min R S rflS trnS inS red) (inS r)
-
-  -- it is also functorial wrt the order of binary relation
-  rtclos-fun : {R S : ∀ {n} → Trm n → Trm n → Set}
-                  → (∀ {n} M N → R {n} M N → S M N)
-                    → ∀ {n M N} → trans-clos R {n} M N → trans-clos S M N
-  rtclos-fun pf (tcrfl M) =
-    tcrfl M
-  rtclos-fun pf {N = N} (tccnc {_} {M} {M'} {N} red r) =
-    tccnc (rtclos-fun pf red) (pf M' N r)
-
   --------------------
   -- Diamond property
   --------------------
@@ -382,28 +343,29 @@ module Lambda-Calculus where
 
 
   -- the transitive closure preserves the diamond property
+  
   rtclosure-diamond-aux : (R : {n : Nat} → Trm n → Trm n → Set)
-                             → diamond-prop R → ∀ {n M N L} → trans-clos R M N → R M L
-                               → Σ (Trm n) (λ x → R N x × trans-clos R L x)
+                             → diamond-prop R → ∀ {n M N L} → refl-trans-clos R M N → R M L
+                               → Σ (Trm n) (λ x → R N x × refl-trans-clos R L x)
   rtclosure-diamond-aux R diam {N = M} {L} (tcrfl M) r =
     L ,, (r , tcrfl L)
-  rtclosure-diamond-aux R diam {N = N} {L} (tccnc {_} {M} {N'} red r') r =
+  rtclosure-diamond-aux R diam {N = N} {L} (tccnc {M} {N'} red r') r =
     ⋄trm R snkR ,, (⋄red₁ R snkR , tccnc (prj2 (pj2 snk)) (⋄red₂ R snkR))
-    where snk : Σ (Trm _) (λ x → R N' x × trans-clos R L x)
+    where snk : Σ (Trm _) (λ x → R N' x × refl-trans-clos R L x)
           snk = rtclosure-diamond-aux R diam red r 
           snkR : Sink R N (pj1 snk)
           snkR = diam r' (prj1 (pj2 snk))
 
   rtclosure-diamond : (R : {n : Nat} → Trm n → Trm n → Set)
-                         → diamond-prop R → diamond-prop (trans-clos R)
+                         → diamond-prop R → diamond-prop (refl-trans-clos R)
   rtclosure-diamond R diam {_} {M} {N} {M} red₁ (tcrfl M) =
     N ,, (tcrfl N , red₁)
-  rtclosure-diamond R diam {_} {M} {N} {L} red₁ (tccnc {_} {M} {N'} red₂ r) =
-    pj1 snk2 ,, (tccnc {N = pj1 snk1} (⋄red₁ (trans-clos R) snk1) (prj1 (pj2 snk2))
+  rtclosure-diamond R diam {_} {M} {N} {L} red₁ (tccnc {M} {N'} red₂ r) =
+    pj1 snk2 ,, (tccnc {N = pj1 snk1} (⋄red₁ (refl-trans-clos R) snk1) (prj1 (pj2 snk2))
                 , prj2 (pj2 snk2))
-    where snk1 : Sink (trans-clos R) N N'
+    where snk1 : Sink (refl-trans-clos R) N N'
           snk1 = rtclosure-diamond R diam red₁ red₂
-          snk2 : Σ (Trm _) (λ x → R (pj1 snk1) x × trans-clos R L x)
+          snk2 : Σ (Trm _) (λ x → R (pj1 snk1) x × refl-trans-clos R L x)
           snk2 = rtclosure-diamond-aux R diam (prj2 (pj2 snk1)) r
 
 
@@ -422,7 +384,7 @@ module Lambda-Calculus where
 
   -- reflexive and transitive closure of the one-step reduction relation
   _⟶⋆_ :  {n : Nat} → Trm n → Trm n → Set
-  _⟶⋆_ = trans-clos _⟶_
+  _⟶⋆_ = refl-trans-clos _⟶_
   ⟶⋆rfl : ∀ {n} → (M : Trm n) → M ⟶⋆ M
   ⟶⋆rfl = tcrfl
   ⟶⋆cnc : ∀ {n} → {M N L : Trm n} → M ⟶⋆ N → N ⟶ L → M ⟶⋆ L
@@ -441,7 +403,7 @@ module Lambda-Calculus where
     ≡>app : ∀ {M} {N} {M'} {N'} → M ≡> M' → N ≡> N' → (app M N) ≡> (app M' N')
   -- and its reflexive and transitive closure
   _≡>⋆_ : {n : Nat} → Trm n → Trm n → Set
-  _≡>⋆_ = trans-clos _≡>_
+  _≡>⋆_ = refl-trans-clos _≡>_
   ≡>⋆rfl : ∀ {n} → (M : Trm n) → M ≡>⋆ M
   ≡>⋆rfl = tcrfl
   ≡>⋆cnc : ∀ {n} → {M N L : Trm n} → M ≡>⋆ N → N ≡> L → M ≡>⋆ L
@@ -668,7 +630,7 @@ module Lambda-Calculus where
 
   -- ⟶⋆ and ≡>⋆ are the same relation
   ≡>⋆<⟶⋆ : {n : Nat}{M N : Trm n} → M ≡>⋆ N → M ⟶⋆ N
-  ≡>⋆<⟶⋆ = rtclos-min _≡>_ _⟶⋆_ (λ {_} {M} → ⟶⋆rfl M) ⟶⋆tr ≡><⟶⋆
+  ≡>⋆<⟶⋆ = rtclos-min _≡>_ _⟶⋆_ (λ {M} → ⟶⋆rfl M) ⟶⋆tr ≡><⟶⋆
   ⟶⋆<≡>⋆ : {n : Nat}{M N : Trm n} → M ⟶⋆ N → M ≡>⋆ N
   ⟶⋆<≡>⋆ = rtclos-fun (λ M N → ⟶<≡> {M = M} {N})
 

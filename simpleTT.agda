@@ -27,7 +27,7 @@ module simpleTT (A : Set) where
     here  : ∀ {T Γ} → T ∷ Γ ∋ fz ∶ T
     there : ∀ {T S Γ i} → Γ ∋ i ∶ T → S ∷ Γ ∋ fs i ∶ T
 
-  -- typing judgement
+  -- typing judgements
   data _⊢_∶_ : (Γ : Ctx) → Trm (len Γ) → Ty → Set where
     ⊢-var : ∀ {T Γ i} → Γ ∋ i ∶ T → Γ ⊢ var i ∶ T
     ⊢-abs : ∀ {Γ T S M} → T ∷ Γ ⊢ M ∶ S → Γ ⊢ lam M ∶ T ⇒ S
