@@ -55,16 +55,6 @@ N₁ = Fin (suc zero)
 N₁ind : {C : N₁ → Set}(c : C 0₁) → (x : N₁) → C x
 N₁ind {C} c fz = c
 
-liftFin :  ∀ {n m} → (Fin n → Fin m) → Fin (suc n) → Fin (suc m)
-liftFin f fz = fz
-liftFin f (fs i) = fs (f i)
--- listFin f = [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
-
-liftFin-cmp-ptw : {n m k : Nat}(f : Fin n → Fin m)(g : Fin m → Fin k)
-                     → (i : Fin (suc n)) → liftFin g (liftFin f i) == liftFin (g ∘ f) i
-liftFin-cmp-ptw f g fz = =rf
-liftFin-cmp-ptw f g (fs i) = =rf
-
 
 --------------------------------
 -- Some stuff on identity types
@@ -75,11 +65,6 @@ liftFin-cmp-ptw f g (fs i) = =rf
 =J : {A : Set}{a₀ : A}(B : (a : A) → a₀ == a → Set)
         → B a₀ =rf → {a : A} → (p : a₀ == a) → B a p
 =J B b₀ =rf = b₀
-
-{-
-check : {A : Set}{a : A}(p : a == a) → (p == refl)
-check =rf = {!!}
--}
 
 
 -- Some useful properties
