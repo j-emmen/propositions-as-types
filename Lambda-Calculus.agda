@@ -1,7 +1,7 @@
 
 
 module Lambda-Calculus where
-  open import BasicInductives
+  open import Basic-Inductives
 
 
   -- canonical lift of a function between finite sets
@@ -768,37 +768,6 @@ module Lambda-Calculus where
     pj1 ≡>⋆snk ,, (≡>⋆<⟶⋆ (prj1 (pj2 ≡>⋆snk)) , ≡>⋆<⟶⋆ (prj2 (pj2 ≡>⋆snk)))
     where ≡>⋆snk : Sink _≡>⋆_ N L
           ≡>⋆snk = ≡>⋆-has-diamond (⟶⋆<≡>⋆ red₁) (⟶⋆<≡>⋆ red₂)
-
-
-
-  -- simple types
-  module STL (A : Set) where
-    data Ty : Set where
-      atm : A → Ty
-      _⇒_ : Ty → Ty → Ty
-
-    data Ctx : Set where
-      [] : Ctx
-      _∷_ : Ty → Ctx → Ctx
-
-    len : Ctx → Nat
-    len [] = zero
-    len (T ∷ Γ) = suc (len Γ)
-
-    data _∋_∶_ : (Γ : Ctx) → Fin (len Γ) → Ty → Set where
-      here  : ∀ {T Γ} → (T ∷ Γ) ∋ fz ∶ T
-      there : ∀ {T S Γ i} → Γ ∋ i ∶ T → (S ∷ Γ) ∋ (fs i) ∶ T
-
-    data _⊢_∈_ : (Γ : Ctx) → Trm (len Γ) → Ty → Set where
-      t-var : ∀ {T Γ i} → Γ ∋ i ∶ T → Γ ⊢ var i ∈ T
-      t-abs : ∀ {Γ T S M} → (T ∷ Γ) ⊢ M ∈ S → Γ ⊢ lam M ∈ (T ⇒ S)
-      t-app : ∀ {Γ T S M N} → Γ ⊢ M ∈ (T ⇒ S) → Γ ⊢ N ∈ T → Γ ⊢ app M N ∈ S 
-
-
-
-
-
-
 
 
 -- end file

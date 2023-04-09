@@ -1,5 +1,5 @@
 
-module BasicInductives where
+module Basic-Inductives where
 
 
 -- Identity and composite functions

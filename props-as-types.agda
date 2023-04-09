@@ -1,22 +1,23 @@
 {-# OPTIONS --show-implicit #-}
 
 import IPL-implic-frag
-import simpleTT
-import lambda-calc
+open import Basic-Inductives
+open import Lambda-Calculus
+open import simpleTT
 
 module props-as-types {A : Set} where
   module NJ = IPL-implic-frag A
   module TT = simpleTT A
-  open lambda-calc public
+  --open lambda-calc public
 
   u₂ : TT.Ty → NJ.WFF
-  u₂ (TT.atom a) = NJ.atom a
+  u₂ (TT.atm a) = NJ.atm a
   u₂ (S TT.⇒ T) = (u₂ S) NJ.⊃ (u₂ T)
   u₂' : NJ.WFF → TT.Ty
-  u₂' (NJ.atom a) = TT.atom a
+  u₂' (NJ.atm a) = TT.atm a
   u₂' (P NJ.⊃ Q) = (u₂' P) TT.⇒ (u₂' Q)
 
-  u₁ : {n : ℕ} → TT.Ctx n → NJ.Prem
+  u₁ : {n : Nat} → TT.Ctx n → NJ.Prem
   u₁ TT.[] = NJ.[]
   u₁ (Γ TT., T) = (u₁ Γ) NJ., (u₂ T)
 
@@ -24,7 +25,7 @@ module props-as-types {A : Set} where
   u₁' NJ.[] = TT.[]
   u₁' (Δ NJ., P) = (u₁' Δ) TT., (u₂' P)
 
-  u : {n : ℕ}{Γ : TT.Ctx n}{M : ΛTerm}{T : TT.Ty} → TT.JdgDer Γ M T → NJ.JdgDer (u₁ Γ) (u₂ T)
+  u : {n : Nat}{Γ : TT.Ctx n}{M : ΛTerm}{T : TT.Ty} → TT.JdgDer Γ M T → NJ.JdgDer (u₁ Γ) (u₂ T)
   u (TT.Var Γ T) = NJ.Ass (u₁ Γ) (u₂ T)
   u (TT.Weak S pf) = NJ.Weak (u₂ S) (u pf)
   u (TT.Abs pf) = NJ.cur (u pf)
