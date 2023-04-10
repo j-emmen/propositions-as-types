@@ -1,48 +1,60 @@
-{-# OPTIONS --show-implicit #-}
-
-import IPL-implic-frag
-open import Basic-Inductives
-open import Lambda-Calculus
-open import simpleTT
 
 module props-as-types {A : Set} where
+  open import Basic-Inductives
+  import simpleTT
+  import IPL-implic-frag
   module NJ = IPL-implic-frag A
   module TT = simpleTT A
-  --open lambda-calc public
-
-  u₂ : TT.Ty → NJ.WFF
-  u₂ (TT.atm a) = NJ.atm a
-  u₂ (S TT.⇒ T) = (u₂ S) NJ.⊃ (u₂ T)
-  u₂' : NJ.WFF → TT.Ty
-  u₂' (NJ.atm a) = TT.atm a
-  u₂' (P NJ.⊃ Q) = (u₂' P) TT.⇒ (u₂' Q)
-
-  u₁ : {n : Nat} → TT.Ctx n → NJ.Prem
-  u₁ TT.[] = NJ.[]
-  u₁ (Γ TT., T) = (u₁ Γ) NJ., (u₂ T)
-
-  u₁' : (Δ : NJ.Prem) → TT.Ctx (NJ.len Δ)
-  u₁' NJ.[] = TT.[]
-  u₁' (Δ NJ., P) = (u₁' Δ) TT., (u₂' P)
-
-  u : {n : Nat}{Γ : TT.Ctx n}{M : ΛTerm}{T : TT.Ty} → TT.JdgDer Γ M T → NJ.JdgDer (u₁ Γ) (u₂ T)
-  u (TT.Var Γ T) = NJ.Ass (u₁ Γ) (u₂ T)
-  u (TT.Weak S pf) = NJ.Weak (u₂ S) (u pf)
-  u (TT.Abs pf) = NJ.cur (u pf)
-  u (TT.App pf₁ pf₂) = NJ.→E _ _ _ (u pf₁) (u pf₂)
-
-  t : {Δ : NJ.Prem}{P : NJ.WFF} → NJ.JdgDer Δ P → ΛTerm
-  t (NJ.Ass Δ P) = var (TT.suc (NJ.len Δ))
-  t (NJ.Weak R pf) = t pf
-  t (NJ.→I Δ P Q pf) = lam (TT.suc (NJ.len Δ)) (t {Δ NJ., P} {Q} pf)
-  t (NJ.→E Δ Q P pf₁ pf₂) = app (t {Δ} {Q NJ.⊃ P} pf₁) (t {Δ} {Q} pf₂)
-  -- if implicit arguments in def of t above are explcitly given,
-  -- then t does not β-reduce to canonical forms ('lam' and 'app') where it should.
-  
-  u' : {Δ : NJ.Prem}{P : NJ.WFF} → (pf : NJ.JdgDer Δ P) → TT.JdgDer (u₁' Δ) (t pf) (u₂' P)
-  u' (NJ.Ass Δ P) = TT.Var (u₁' Δ) (u₂' P)
-  u' (NJ.Weak R pf) = TT.Weak (u₂' R) (u' pf)
-  u' (NJ.→I Δ P Q pf) = TT.Abs (u' pf)
-  u' (NJ.→E Δ P₁ P pf₁ pf₂) = TT.App (u' pf₁) (u' pf₂)
+  open TT hiding (atm)
+  open NJ hiding (atm)
  
-  -- u and u' form equivalence of types? 
+
+  u₂ : Ty → WFF
+  u₂ (TT.atm a) = NJ.atm a
+  u₂ (T₁ ⇒ T₂) = (u₂ T₁) ⊃ (u₂ T₂)
+  u₂' : WFF → Ty
+  u₂' (NJ.atm a) = TT.atm a
+  u₂' (P₁ ⊃ P₂) = (u₂' P₁) ⇒ (u₂' P₂)
+
+  u₁ : Ctx → Prem
+  u₁ [] = []
+  u₁ (T ∣ Γ) = (u₂ T) ∣  (u₁ Γ)
+  u₁' : (Δ : Prem) → Ctx
+  u₁' [] = []
+  u₁' (P ∣ Δ) = (u₂' P) ∣ (u₁' Δ)
+
+  u∋ : {Γ : Ctx}{i : Fin (len Γ)}{T : Ty}
+         → Γ ∋ i ∶ T → (u₁ Γ) ∋ (u₂ T)
+  u∋ here = here
+  u∋ (there inc) = there (u∋ inc)
+
+  pos' : {Δ : Prem}{P : WFF}
+            → Δ ∋ P → Fin (len (u₁' Δ))
+  pos' here = fz
+  pos' (there inp) = fs (pos' inp)
+
+  u'∋ : {Δ : Prem}{P : WFF}
+         → (inp : Δ ∋ P) → (u₁' Δ) ∋ (pos' inp) ∶ (u₂' P)
+  u'∋ here = here
+  u'∋ (there inp) = there (u'∋ inp)
+
+  -- from derivations in TT to derivations in NJ
+  u : {Γ : Ctx}{M : Trm (len Γ)}{T : Ty}
+         → Γ ⊢ M ∶ T → (u₁ Γ) ⊢ (u₂ T)
+  u (⊢-var inc) = Ass (u∋ inc)
+  u (⊢-abs derTT) = →I (u derTT)
+  u (⊢-app derTT₁ derTT₂) = →E (u derTT₁) (u derTT₂)
+
+  -- from derivations in NJ to derivations in TT
+  t : {Δ : Prem}{P : WFF} → Δ ⊢ P → Trm (len (u₁' Δ))
+  t (Ass inp) = var (pos' inp)
+  t (→I derNJ) = lam (t derNJ)
+  t (→E derNJ₁ derNJ₂) = app (t derNJ₁) (t derNJ₂)
+
+  u' : {Δ : Prem}{P : WFF}
+          → (derNJ : Δ ⊢ P) → (u₁' Δ) ⊢ (t derNJ) ∶ (u₂' P)
+  u' (Ass inp) = ⊢-var (u'∋ inp)
+  u' (→I derNJ) = ⊢-abs (u' derNJ)
+  u' (→E derNJ₁ derNJ₂) = ⊢-app (u' derNJ₁) (u' derNJ₂)
+
+-- end file

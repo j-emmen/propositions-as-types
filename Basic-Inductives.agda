@@ -309,11 +309,63 @@ module Basic-Inductives where
   HoTT-Thm7-2-2 Rrf Risprop R→== = UIPrf→UIP (HoTT-Thm7-2-2-aux Rrf Risprop R→==)
 
 
+  -- Lists
+
+  infixr 20 _∣_ _∥_
+  data List (A : Set) : Set where
+    [] : List A
+    _∣_ : A → List A → List A
+
+  len : {A : Set} → List A → Nat
+  len [] = zero
+  len (a ∣ α) = suc (len α)
+
+  _∥_ : {A : Set} → List A → List A → List A
+  [] ∥ Ξ = Ξ
+  (P ∣ Δ) ∥ Ξ = P ∣ (Δ ∥ Ξ)
+
+  infix 10 _∋_
+  data _∋_ {A : Set} : List A → A → Set where
+    here  : ∀ {α a} → a ∣ α ∋ a
+    there : ∀ {α a b} → α ∋ a → b ∣ α ∋ a
+
+  pos :  ∀ {A α a} → α ∋ a → Fin (len {A = A} α)
+  pos here = fz
+  pos (there inl) = fs (pos inl)
+
 
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation
   ------------------------------------------------------------
 
+  -- transitive closure
+  data trans-clos {A : Set}(R : A → A → Set) : A → A → Set where
+    tcin : ∀ {M N} → R M N → trans-clos R M N
+    tccnc : ∀ {M N L} → trans-clos R M N → R N L → trans-clos R M L
+
+  -- the transitive closure is transitive
+  trnclos-trans : {A : Set}(R : A → A → Set){M N L : A}
+                    → trans-clos R M N → trans-clos R N L → trans-clos R M L
+  trnclos-trans R red (tcin stp) =           tccnc red stp
+  trnclos-trans R red₁ (tccnc red₂ stp) =    tccnc (trnclos-trans R red₁ red₂) stp
+
+  -- and it is the minimal such
+  trnclos-min : {A : Set}(R S : A → A → Set)
+                  → (∀ {M N L} → S M N → S N L → S M L) → (∀ {M N} → R M N → S M N)
+                      → ∀ {M N} → trans-clos R M N → S M N
+  trnclos-min R S trnS inS {M} (tcin stp) =     inS stp
+  trnclos-min R S trnS inS (tccnc red stp) =    trnS (trnclos-min R S trnS inS red) (inS stp)
+
+  -- it is also functorial wrt the order of binary relation
+  trnclos-fun : {A : Set}{R S : A → A → Set}
+                  → (∀ {M N} → R M N → S M N)
+                    → ∀ {M N} → trans-clos R M N → trans-clos S M N
+  trnclos-fun inS (tcin r) =                               tcin (inS r)
+  trnclos-fun inS {N = N} (tccnc {M} {M'} {N} red r) =     tccnc (trnclos-fun inS red) (inS r)
+
+
+
+  -- the reflexive and transitive closure
   data refl-trans-clos {A : Set}(R : A → A → Set) : A → A → Set where
     tcrfl : ∀ M → refl-trans-clos R M M
     tccnc : ∀ {M N L} → refl-trans-clos R M N → R N L → refl-trans-clos R M L
