@@ -48,13 +48,15 @@ module Basic-Inductives where
     fz : ∀ {n} → Fin (suc n)
     fs : ∀ {n} → Fin n → Fin (suc n)
 
-  N₁ : Set
+  N₀ N₁ : Set
+  N₀ = Fin zero
   N₁ = Fin (suc zero)
   0₁ : N₁
   0₁ = fz
+  N₀ind : {C : N₀ → Set} → (x : N₀) → C x
+  N₀ind {C} ()
   N₁ind : {C : N₁ → Set}(c : C 0₁) → (x : N₁) → C x
   N₁ind {C} c fz = c
-
 
   --------------------------------
   -- Some stuff on identity types
