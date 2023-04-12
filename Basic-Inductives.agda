@@ -311,6 +311,48 @@ module Basic-Inductives where
   HoTT-Thm7-2-2 Rrf Risprop R→== = UIPrf→UIP (HoTT-Thm7-2-2-aux Rrf Risprop R→==)
 
 
+  -------------------
+  -- Some arithmetic
+  -------------------
+
+  PA4 : ∀ {n} → suc n == zero → N₀
+  PA4 p = =transp fam4 p 0₁ 
+        where fam4 : Nat → Set
+              fam4 zero = N₀
+              fam4 (suc n) = N₁
+
+  prdc : Nat → Nat
+  prdc zero = zero
+  prdc (suc n) = n
+
+  suc-inj : ∀ {n m} → suc n == suc m → n == m
+  suc-inj {n} {m} p = =ap prdc p
+
+  infix 5 _≤N_
+  _≤N_ : Nat → Nat → Set
+  zero ≤N m = N₁
+  suc n ≤N zero = N₀
+  suc n ≤N suc m = n ≤N m
+
+  suc-non-decr : ∀ n → suc n ≤N n → N₀
+  suc-non-decr (suc n) dq = suc-non-decr n dq
+
+  ≤N-rfl : ∀ {n} → n ≤N n
+  ≤N-rfl {zero} = 0₁
+  ≤N-rfl {suc n} = ≤N-rfl {n}
+  
+  ≤N-trn : ∀ {n m l} → n ≤N m → m ≤N l → n ≤N l
+  ≤N-trn {zero} dq₁ dq₂ = 0₁
+  ≤N-trn {suc n} {suc m} {suc l} dq₁ dq₂ = ≤N-trn {n} {m} {l} dq₁ dq₂
+
+  suc-≤-0 : ∀ n → n ≤N suc n
+  suc-≤-0 zero = 0₁
+  suc-≤-0 (suc n) = suc-≤-0 n
+
+  suc-≤ : ∀ n m → n ≤N m → n ≤N suc m
+  suc-≤ n m dq = ≤N-trn {n} dq (suc-≤-0 m)
+
+
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation
   ------------------------------------------------------------
@@ -415,7 +457,8 @@ module Basic-Inductives where
   ≡rfl : {A : Set} → {α : List A} → α ≡ α
   ≡rfl {α = []} = ≡[]
   ≡rfl {α = a ∣ α} = ≡cnc a ≡rfl
-  
+
+  -- transitive closure, i.e. the actual equivalence relation
   _≡⋆_ : {A : Set} → List A → List A → Set
   _≡⋆_ = trans-clos _≡_
   ≡⋆rfl : {A : Set} → {α : List A} → α ≡⋆ α
