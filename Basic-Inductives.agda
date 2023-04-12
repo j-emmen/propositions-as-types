@@ -311,31 +311,6 @@ module Basic-Inductives where
   HoTT-Thm7-2-2 Rrf Risprop R→== = UIPrf→UIP (HoTT-Thm7-2-2-aux Rrf Risprop R→==)
 
 
-  -- Lists
-
-  infixr 20 _∣_ _∥_
-  data List (A : Set) : Set where
-    [] : List A
-    _∣_ : A → List A → List A
-
-  len : {A : Set} → List A → Nat
-  len [] = zero
-  len (a ∣ α) = suc (len α)
-
-  _∥_ : {A : Set} → List A → List A → List A
-  [] ∥ Ξ = Ξ
-  (P ∣ Δ) ∥ Ξ = P ∣ (Δ ∥ Ξ)
-
-  infix 10 _∋_
-  data _∋_ {A : Set} : List A → A → Set where
-    here  : ∀ {α a} → a ∣ α ∋ a
-    there : ∀ {α a b} → α ∋ a → b ∣ α ∋ a
-
-  pos :  ∀ {A α a} → α ∋ a → Fin (len {A = A} α)
-  pos here = fz
-  pos (there inl) = fs (pos inl)
-
-
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation
   ------------------------------------------------------------
@@ -402,5 +377,77 @@ module Basic-Inductives where
   rtclos-fun pf {N = N} (tccnc {M} {M'} {N} red r) =
     tccnc (rtclos-fun pf red) (pf M' N r)
 
+
+  ---------
+  -- Lists
+  ---------
+
+  infixr 20 _∣_ _∥_
+  data List (A : Set) : Set where
+    [] : List A
+    _∣_ : A → List A → List A
+
+  len : {A : Set} → List A → Nat
+  len [] = zero
+  len (a ∣ α) = suc (len α)
+
+  _∥_ : {A : Set} → List A → List A → List A
+  [] ∥ Ξ = Ξ
+  (P ∣ Δ) ∥ Ξ = P ∣ (Δ ∥ Ξ)
+
+  infix 10 _∋_
+  data _∋_ {A : Set} : List A → A → Set where
+    here  : ∀ {α a} → a ∣ α ∋ a
+    there : ∀ {α a b} → α ∋ a → b ∣ α ∋ a
+
+  pos :  ∀ {A α a} → α ∋ a → Fin (len {A = A} α)
+  pos here = fz
+  pos (there inl) = fs (pos inl)
+
+
+  -- lists up to the order of their elements (= multi-sets)
+  infix 15 _≡_ _≡⋆_
+  data _≡_ {A : Set} : List A → List A → Set where
+    ≡[] : [] ≡ []
+    ≡cnc : ∀ {α α'} a → α ≡ α' → a ∣ α ≡ a ∣ α'
+    ≡swp : ∀ {α α'} a b → α ≡ α' → a ∣ b ∣ α ≡ b ∣ a ∣ α'
+
+  ≡rfl : {A : Set} → {α : List A} → α ≡ α
+  ≡rfl {α = []} = ≡[]
+  ≡rfl {α = a ∣ α} = ≡cnc a ≡rfl
+  
+  _≡⋆_ : {A : Set} → List A → List A → Set
+  _≡⋆_ = trans-clos _≡_
+  ≡⋆rfl : {A : Set} → {α : List A} → α ≡⋆ α
+  ≡⋆rfl = tcin ≡rfl
+  ≡⋆cnc : {A : Set} → {α β γ : List A} → α ≡⋆ β → β ≡ γ → α ≡⋆ γ
+  ≡⋆cnc = tccnc
+  ≡⋆in : {A : Set} → {α β : List A} → α ≡ β  → α ≡⋆ β
+  ≡⋆in = tcin
+  ≡⋆tr : {A : Set} → {α β γ : List A} → α ≡⋆ β → β ≡⋆ γ → α ≡⋆ γ
+  ≡⋆tr = trnclos-trans _≡_
+
+  ≡⋆ext : {A : Set} → {α β : List A} → (a : A) → α ≡⋆ β → a ∣ α ≡⋆ a ∣ β
+  ≡⋆ext a (tcin eqv) =                   ≡⋆in (≡cnc a eqv)
+  ≡⋆ext a (tccnc {α} {α'}  ch eqv) =     ≡⋆cnc (≡⋆ext a ch) (≡cnc a eqv)  
+
+  ≡swpcnc : {A : Set} → {α α' : List A} → {a b : A} → α ≡ b ∣ α' → a ∣ α ≡⋆ b ∣ a ∣ α'
+  ≡swpcnc {a = a} {b} (≡cnc b eqv) =  tcin (≡swp a b eqv)
+  ≡swpcnc {a = a} (≡swp c b eqv) =    tccnc (tcin (≡cnc a (≡swp c b ≡rfl))) (≡swp a b (≡cnc c eqv))
+
+  ≡⋆swpcnc : {A : Set} → {α α' : List A} → {a b : A} → α ≡⋆ b ∣ α' → a ∣ α ≡⋆ b ∣ a ∣ α'
+  ≡⋆swpcnc {a = a} {b} (tcin eqv) =               ≡swpcnc eqv
+  ≡⋆swpcnc {a = a} {b} (tccnc {α} {β} ch eqv) =   ≡⋆tr (≡⋆ext a ch) (≡swpcnc eqv)
+
+  ≡-∋ : {A : Set} → {α α' : List A} → {a : A} → α ≡ α' → α ∋ a → α' ∋ a
+  ≡-∋ (≡cnc a eqv) here = here
+  ≡-∋ (≡cnc c eqv) (there inp) = there (≡-∋ eqv inp)
+  ≡-∋ (≡swp a b eqv) here = there here
+  ≡-∋ (≡swp c a eqv) (there here) = here
+  ≡-∋ (≡swp c b eqv) (there (there inp)) = there (there (≡-∋ eqv inp))
+
+  ≡⋆-∋ : {A : Set} → {α α' : List A} → {a : A} → α ≡⋆ α' → α ∋ a → α' ∋ a
+  ≡⋆-∋ (tcin eqv) inp = ≡-∋ eqv inp
+  ≡⋆-∋ (tccnc {α} {β} ch eqv) inp = ≡-∋ eqv (≡⋆-∋ ch inp)
 
 -- end file

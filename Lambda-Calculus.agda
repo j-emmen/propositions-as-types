@@ -107,6 +107,13 @@ module Lambda-Calculus where
   rename-sq (app M₁ M₂) {f} {f'} {g} {g'} pf =
     =ap₂ app (rename-sq M₁ {g' = g'} pf) (rename-sq M₂ {g' = g'} pf)
 
+  rename-sq⁻¹ : {n m : Nat}(M : Trm n){f : Fin n → Fin m}{f' : Fin (suc n) → Fin (suc m)}
+                {g : Fin n → Fin (suc n)}{g' : Fin m → Fin (suc m)}
+                 → (∀ i → g' (f i) == f' (g i))
+                   → rename (rename M g) f' == rename M (g' ∘ f)
+  rename-sq⁻¹ M {f} {g' = g'} pf = rename-sq M {f} {g' = g'} pf ⁻¹
+
+
   ext-rename : {n m : Nat}(M : Trm n)(f : Fin n → Fin m)
                   → ext (rename M f) == rename (ext M) (liftFin f)
   ext-rename M f = =proof
