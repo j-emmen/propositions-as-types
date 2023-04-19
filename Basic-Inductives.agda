@@ -58,6 +58,7 @@ module Basic-Inductives where
   N₁ind : {C : N₁ → Set}(c : C 0₁) → (x : N₁) → C x
   N₁ind {C} c fz = c
 
+
   --------------------------------
   -- Some stuff on identity types
   --------------------------------
@@ -352,6 +353,52 @@ module Basic-Inductives where
   suc-≤ : ∀ n m → n ≤N m → n ≤N suc m
   suc-≤ n m dq = ≤N-trn {n} dq (suc-≤-0 m)
 
+  -- finite sets
+  
+  pdcFin : ∀ {n} → Fin (suc (suc n)) → Fin (suc n)
+  pdcFin fz = fz
+  pdcFin (fs i) = i
+
+  fs-inj : ∀ {n}{i j : Fin n} → fs i == fs j → i == j
+  fs-inj {_} {fz} {fz} eq = =rf
+  fs-inj {_} {fs i} {fs j} eq = =ap pdcFin eq
+
+  PA4-Fin : ∀ {n}{i : Fin n} → fz == fs i → N₀
+  PA4-Fin {n} {i} eq = =transp fam4 eq 0₁
+                     where fam4 : Fin (suc n) → Set
+                           fam4 fz = N₁
+                           fam4 (fs i) = N₀
+
+  miss-Fin : ∀ {n} → (i : Fin (suc n))
+               → Σ (Fin n → Fin (suc n)) (λ x → ∀ j → i == x j → N₀)
+  miss-Fin fz = fs ,, λ j → PA4-Fin {i = j}
+  miss-Fin {suc n} (fs i) = fst ,, snd
+    where ih : Σ (Fin n → Fin (suc n)) (λ x → ∀ j → i == x j → N₀)
+          ih = miss-Fin i
+          fst : Fin (suc n) → Fin (suc (suc n))
+          fst fz = fz
+          fst (fs j) = fs (pj1 ih j)
+          snd : (j : Fin (suc n)) → fs i == fst j → N₀
+          snd fz eq = PA4-Fin {i = i} (eq ⁻¹)
+          snd (fs j) eq = pj2 ih j (fs-inj eq)
+
+  miss-restr : ∀ {n m} → (f : Fin n → Fin (suc m))
+                → ∀ i → (∀ j → Σ (Fin m) (λ x → f j == pj1 (miss-Fin i) x))
+                  → Σ (Fin n → Fin m)
+                       (λ x → ∀ j → f j == pj1 (miss-Fin i) (x j))
+  miss-restr {n} {m} f i missi = (λ j → pj1 (missi j)) ,, (λ j → pj2 (missi j))
+
+{-
+  missf-Fin : ∀ {n m} → (f : Fin (suc n) → Fin (suc m))
+                → ∀ i → Σ (Fin n → Fin m)
+                           (λ x → ∀ j → f (pj1 (miss-Fin i) j) == pj1 (miss-Fin (f i)) (x j))
+  missf-Fin {n} {m} f i = {!!} ,, {!!}
+    where rst : Σ (Fin n → Fin m)
+                  (λ x → ∀ j → f (pj1 (miss-Fin i) j) == pj1 (miss-Fin (f i)) (x j))
+          rst = miss-restr (f ∘ pj1 (miss-Fin i))
+                           (f i)
+                           (λ j → {!!})
+-}
 
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation
@@ -442,10 +489,15 @@ module Basic-Inductives where
     here  : ∀ {α a} → a ∣ α ∋ a
     there : ∀ {α a b} → α ∋ a → b ∣ α ∋ a
 
+  -- position of the member of a list
   pos :  ∀ {A α a} → α ∋ a → Fin (len {A = A} α)
   pos here = fz
   pos (there inl) = fs (pos inl)
 
+  -- i-th element
+  lst-pr : {A : Set} → (α : List A) → Fin (len α) → A
+  lst-pr (a ∣ α) fz = a
+  lst-pr (a ∣ α) (fs i) = lst-pr α i
 
   -- lists up to the order of their elements (= multi-sets)
   infix 15 _≡_ _≡⋆_

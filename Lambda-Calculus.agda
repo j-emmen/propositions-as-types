@@ -210,6 +210,12 @@ module Lambda-Calculus where
   wlift-var fz = =rf
   wlift-var (fs i) = =rf
 
+  wlift-var-fn : ∀ {n m} → {f : Fin n → Fin m} → {f' : Fin (suc n) → Fin (suc m)}
+                   → fz == f' fz → (∀ i → fs (f i) == f' (fs i))
+                   → ∀ i → wlift (var ∘ f) i == (var ∘ f') i
+  wlift-var-fn eqz eqs fz = =ap var eqz
+  wlift-var-fn eqz eqs (fs i) = =ap var (eqs i)
+
   -- wlift (trmsect N) : Fin (suc (suc n)) → Trm (suc n)
   -- wlift (trmsect N) : fz ↦ var fz; fs fz ↦ ext N; fs (fs x) ↦ var (fs x)
   -- liftFin fs : fz ↦ fz; fs x ↦ fs (fs x)
