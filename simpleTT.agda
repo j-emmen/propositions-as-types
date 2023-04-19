@@ -60,35 +60,29 @@ module simpleTT (A : Set) where
                     → Γ' ◂ Γ ∶ p → (S ∣ R ∣ Γ') ◂ (R ∣ S ∣ Γ) ∶ p'
 
 
-  -- projections of variables, possibly rearranging occurences of types in contexts
-  infix 10 _◂'_∶_
-  data _◂'_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
-    π'-! : ∀ {Γ' p} → [] ◂' Γ' ∶ p
-    --π'-var : ∀ {Γ Γ' p} → 
-    π'-frg : ∀ {Γ Γ' p p'} R → (∀ i → fs (p i) == p' i)
-               → Γ ◂' Γ' ∶ p → Γ ◂' R ∣ Γ' ∶ p'
-
-  ◂'to◂ : ∀ {Γ Γ' p} → Γ ◂' Γ' ∶ p → Γ ◂ Γ' ∶ p
-  ◂'to◂ {Γ' = []} π'-! = π-∅
-  ◂'to◂ {Γ' = R ∣ Γ'} π'-! = π-frg {p = N₀ind} R N₀ind (◂'to◂ π'-!)
-  ◂'to◂ (π'-frg R eq πp') = π-frg R eq (◂'to◂ πp') 
-
-  -- not sure this holds, ◂' probably are the projections that forget the first variables
-  ◂to◂' : ∀ {Γ Γ' p} → Γ ◂ Γ' ∶ p → Γ ◂' Γ' ∶ p
-  ◂to◂' π-∅ = π'-!
-  ◂to◂' (π-frg R eq πp) = π'-frg R eq (◂to◂' πp)
-  ◂to◂' (π-cnc R eqz eqs πp) = π'-frg R {!!} {!!}
-  ◂to◂' (π-swp R S eqz eqsz eqss πp) = {!!}
-
+  -- projections that forget all or just the first variable
+  infix 10 _◃_∶_
+  data _◃_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
+    π'-! : ∀ {Γ' p} → [] ◃ Γ' ∶ p
+    π'-frg : ∀ {Γ p} R → (∀ i → fs i == p i) → Γ ◃ R ∣ Γ ∶ p
 
   π-id : ∀ {Γ} → Γ ◂ Γ ∶ id
   π-id {[]} = π-∅
   π-id {R ∣ Γ} = π-cnc R =rf (λ _ → =rf) π-id
 
+  ◃to◂ : ∀ {Γ Γ' p} → Γ ◃ Γ' ∶ p → Γ ◂ Γ' ∶ p
+  ◃to◂ {Γ' = []} π'-! = π-∅
+  ◃to◂ {Γ' = R ∣ Γ'} π'-! = π-frg {p = N₀ind} R N₀ind (◃to◂ π'-!)
+  ◃to◂ (π'-frg R eq) = π-frg R eq π-id
+
   π-rfl : ∀ {Γ p} → (∀ i → i == p i) → Γ ◂ Γ ∶ p
   π-rfl {[]} eqp = π-∅
   π-rfl {R ∣ Γ} eqp = π-cnc R (eqp fz) (λ i → eqp (fs i)) π-id
 
+  π'-dsp : ∀ {Γ R} → Γ ◃ R ∣ Γ ∶ fs
+  π'-dsp {Γ} {R} = π'-frg R (λ _ → =rf)
+
+  -- these two terms below could be derived from ◃to◂
   π-dsp : ∀ {Γ R} → Γ ◂ R ∣ Γ ∶ fs
   π-dsp {Γ} {R} = π-frg R (λ _ → =rf) π-id
 
@@ -96,6 +90,8 @@ module simpleTT (A : Set) where
   π-! {[]} p = π-∅
   π-! {R ∣ Γ} p = π-frg {p = N₀ind} R N₀ind (π-! {Γ} _)
 
+  -- projections are closed under composition
+  -- (does not seem to be needed, perhaps because we work pointwise)
   π-cmp : ∀ {Γ Δ Θ p q r} → q ∘ p == r
              → Γ ◂ Δ ∶ p → Δ ◂ Θ ∶ q → Γ ◂ Θ ∶ r
   π-cmp eq π-∅ πq = π-! _
@@ -110,31 +106,38 @@ module simpleTT (A : Set) where
   π-≤ (π-cnc R eqz eqs πp)             = π-≤ πp
   π-≤ (π-swp R S eqz eqsz eqss πp)     = π-≤ πp
 
-  -- the underlying function of a projection is injective
+  -- indeed, the underlying function of a projection is injective (!)
   π-inj : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → ∀ {i j} → p i == p j → i == j
   π-inj (π-frg R eqs πp) {i} {j} eq =
     π-inj πp (fs-inj (eqs i • eq • eqs j ⁻¹))
+  -- π-cnc, first term in eq is  p fz = fz
   π-inj (π-cnc R eqz eqs πp) {fz} {fz} eq =
     =rf
   π-inj (π-cnc R eqz eqs πp) {fz} {fs j} eq =
     N₀ind (PA4-Fin (eqz • eq • eqs j ⁻¹))
+  -- all other variables
   π-inj (π-cnc R eqz eqs πp) {fs i} {fz} eq =
     N₀ind (PA4-Fin (eqz • eq ⁻¹ • eqs i ⁻¹))
   π-inj (π-cnc R eqz eqs πp) {fs i} {fs j} eq =
     =ap fs (π-inj πp (fs-inj (eqs i • eq • eqs j ⁻¹)))
+  -- π-swp, first term in eq is  p fz = fs fz
+  -- here and below, the second are p fz, p (fs fz) = fz, p (fs (fs j))
   π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fz} eq =
     =rf
   π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fs fz} eq =
     N₀ind (PA4-Fin (eqsz • eq ⁻¹ • eqz ⁻¹))
   π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fs (fs j)} eq =
     N₀ind (PA4-Fin (fs-inj (eqz • eq • eqss j ⁻¹)))
+  -- first term in eq is  p (fs fz) = fz
   π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fz} eq =
     N₀ind (PA4-Fin (eqsz • eq • eqz ⁻¹))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fz} eq =
-    N₀ind (PA4-Fin (fs-inj (eqz • eq ⁻¹ • eqss i ⁻¹)))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fs fz} eq = =rf
+  π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fs fz} eq =
+    =rf
   π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fs (fs j)} eq =
     N₀ind (PA4-Fin (eqsz • eq • eqss j ⁻¹))
+  -- all other variables
+  π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fz} eq =
+    N₀ind (PA4-Fin (fs-inj (eqz • eq ⁻¹ • eqss i ⁻¹)))
   π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fs fz} eq =
     N₀ind (PA4-Fin (eqsz • eq ⁻¹ • eqss i ⁻¹))
   π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fs (fs j)} eq =
@@ -181,10 +184,44 @@ module simpleTT (A : Set) where
   ◂∶to≡∶ eq (π-cnc R eqz eqs πp) = ≡∶cnc R eqz eqs (◂∶to≡∶ (suc-inj eq) πp)
   ◂∶to≡∶ eq (π-swp R S eqz eqsz eqss πp) = ≡∶swp R S eqz eqsz eqss (◂∶to≡∶ (suc-inj (suc-inj eq)) πp)
   -- these two probably form an equivalence of types
+  -- between Γ' ≡ Γ ∶ p and (len Γ == len Γ') × (Γ' ◂ Γ ∶ p)
+
+  ≡∶-= : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
+  ≡∶-= eqf ∅ = ∅
+  ≡∶-= eqf (≡∶cnc P eqz eqs bij) = ≡∶cnc P (eqz • eqf fz) (λ i → eqs i • eqf (fs i)) bij
+  ≡∶-= {f = f} {f'} eqf (≡∶swp {f = g} P Q eqsz eqz eqss bij) =
+    ≡∶swp P Q (fs fz                  ==[ eqsz • eqf fz ]              f' fz         )
+              (fz                     ==[ eqz • eqf (fs fz) ]          f' (fs fz)    )
+              (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
+              bij
 
   ∋v∶-= : ∀ {Γ T x x'} → x == x' → Γ ∋ x ∶ T → Γ ∋ x' ∶ T
   ∋v∶-= {Γ} {T} = =transp (λ x → Γ ∋ x ∶ T)
 
+  -- if T occurs in the i-th position in Γ' and Γ' ≡ Γ ∶ f,
+  -- then T occurs in the (f i)-th position in Γ
+  -- (this could also be proven from π-∋∶)
+  ≡∶-∋∶ : ∀ {Γ Γ' f T} → Γ' ≡ Γ ∶ f → ∀ {i} → Γ' ∋ i ∶ T → Γ ∋ (f i) ∶ T
+  ≡∶-∋∶ (≡∶cnc R eqz eqs bij) here =
+    ∋v∶-= eqz here
+  ≡∶-∋∶ (≡∶cnc R eqz eqs bij) {fs i} (there inc) =
+    ∋v∶-= (eqs i) (there (≡∶-∋∶ bij inc))
+  ≡∶-∋∶ (≡∶swp R S eqz eqsz eqss bij) here =
+    ∋v∶-= eqz (there here)
+  ≡∶-∋∶ (≡∶swp R S eqz eqsz eqss bij) (there here) =
+    ∋v∶-= eqsz here
+  ≡∶-∋∶ (≡∶swp R S eqz eqsz eqss bij) {fs (fs i)} (there (there inc)) =
+    ∋v∶-= (eqss i) (there (there (≡∶-∋∶ bij inc)))
+
+  -- the order of premises in a derivation does not matter,
+  -- up to renaming the variables accordingly
+  ≡∶-congr-⊢ : ∀ {Γ Γ' f M T} → Γ' ≡ Γ ∶ f
+                → Γ' ⊢ M ∶ T → Γ ⊢ rename M f ∶ T
+  ≡∶-congr-⊢ bij (⊢-var inc) = ⊢-var (≡∶-∋∶ bij inc)
+  ≡∶-congr-⊢ bij (⊢-abs {T = T} der) = ⊢-abs (≡∶-congr-⊢ (≡∶cnc T =rf (λ _ → =rf) bij) der)
+  ≡∶-congr-⊢ bij (⊢-app der₁ der₂) = ⊢-app (≡∶-congr-⊢ bij der₁) (≡∶-congr-⊢ bij der₂)
+
+  -- some useful properties of derivations
   ⊢∶-= : ∀ {Γ T M M'} → M == M' → Γ ⊢ M ∶ T → Γ ⊢ M' ∶ T
   ⊢∶-= {Γ} {T} = =transp (λ x → Γ ⊢ x ∶ T)
   ⊢v∶-∋∶ : ∀ {Γ T i} → Γ ⊢ var i ∶ T → Γ ∋ i ∶ T
@@ -192,6 +229,7 @@ module simpleTT (A : Set) where
   ⊢∶-∋∶ : ∀ {Γ T M} → Γ ⊢ M ∶ T → ∀ {i} → M == var i → Γ ∋ i ∶ T
   ⊢∶-∋∶ (⊢-var inc) eq = ⊢v∶-∋∶ (⊢∶-= eq (⊢-var inc))
 
+  -- three useful properties of projections
   π-= : ∀ {Γ Γ' p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
   π-= eqp π-∅ = π-∅
   π-= eqp (π-frg R eq πp) = π-frg R (λ i → eq i • eqp i) πp
@@ -219,54 +257,24 @@ module simpleTT (A : Set) where
   π-∋∶ (π-swp R S eqz eqsz eqss πp) {fs (fs i)} (there (there inc)) =
     ∋v∶-= (eqss i) (there (there (π-∋∶ πp inc)))
 
-  -- here need to assume that p is injective
-  π-∋∶-inv : ∀ {Γ Γ' p} → (∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T) → Γ' ◂ Γ ∶ p
-  π-∋∶-inv {[]} {[]} pf =
+
+  π-∋∶-inv : ∀ {Γ Γ' p} → (∀ {i j} → p i == p j → i == j)
+               → (∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T) → Γ' ◂ Γ ∶ p
+  π-∋∶-inv {[]} {[]} inj pf =
     π-∅
-  π-∋∶-inv {R ∣ Γ} {[]} pf =
+  π-∋∶-inv {R ∣ Γ} {[]} inj pf =
     π-frg {p = N₀ind} R N₀ind
-          (π-∋∶-inv λ {x} {_} → N₀ind {λ _ → ([] ∋ x ∶ _ → Γ ∋ N₀ind x ∶ _)} x)
-  π-∋∶-inv {[]} {R' ∣ Γ'} {p} pf =
+          (π-∋∶-inv (λ {i} {j} _ → N₀ind {λ _ → i == j} i)
+                    (λ {x} {_} → N₀ind {λ _ → ([] ∋ x ∶ _ → Γ ∋ N₀ind x ∶ _)} x))
+  π-∋∶-inv {[]} {R' ∣ Γ'} {p} inj pf =
     N₀ind {λ _ → R' ∣ Γ' ◂ [] ∶ p} (p fz)
-  π-∋∶-inv {R ∣ Γ} {R' ∣ Γ'} {p} pf = {!π-∋∶-inv pf'!}
+  π-∋∶-inv {R ∣ Γ} {R' ∣ Γ'} {p} inj pf = {!π-∋∶-inv ? pf'!}
     where pf' : ∀ {i T} → Γ' ∋ i ∶ T → R ∣ Γ ∋ (p (fs i)) ∶ T
           pf' inc = pf (there inc)
           -- need to define p' : Fin (len Γ') → Fin (suc (len Γ'))
           -- s.t. p' i = p (fs i)
           p₀ : Fin (len Γ') → Fin (len Γ)
           p₀ i = {!p (fs i)!}
-
-
-  ≡∶-= : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
-  ≡∶-= eqf ∅ = ∅
-  ≡∶-= eqf (≡∶cnc P eqz eqs bij) = ≡∶cnc P (eqz • eqf fz) (λ i → eqs i • eqf (fs i)) bij
-  ≡∶-= {f = f} {f'} eqf (≡∶swp {f = g} P Q eqsz eqz eqss bij) =
-    ≡∶swp P Q (fs fz                  ==[ eqsz • eqf fz ]              f' fz         )
-              (fz                     ==[ eqz • eqf (fs fz) ]          f' (fs fz)    )
-              (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
-              bij
-
-  -- if T occurs in the i-th position in Γ' and Γ' ≡ Γ ∶ f,
-  -- then T occurs in the (f i)-th position in Γ
-  ≡∶-∋∶ : ∀ {Γ Γ' f T} → Γ' ≡ Γ ∶ f → ∀ {i} → Γ' ∋ i ∶ T → Γ ∋ (f i) ∶ T
-  ≡∶-∋∶ (≡∶cnc P eqz eqs bij) here =
-    ∋v∶-= eqz here
-  ≡∶-∋∶ (≡∶cnc P eqz eqs bij) {fs i} (there inc) =
-    ∋v∶-= (eqs i) (there (≡∶-∋∶ bij inc))
-  ≡∶-∋∶ (≡∶swp P Q eqz eqsz eqss bij) here =
-    ∋v∶-= eqz (there here)
-  ≡∶-∋∶ (≡∶swp P Q eqz eqsz eqss bij) (there here) =
-    ∋v∶-= eqsz here
-  ≡∶-∋∶ (≡∶swp P Q eqz eqsz eqss bij) {fs (fs i)} (there (there inc)) =
-    ∋v∶-= (eqss i) (there (there (≡∶-∋∶ bij inc)))
-
-  -- the order of premises in a derivation does not matter,
-  -- up to renaming the variables accordingly
-  ≡∶-congr-⊢ : ∀ {Γ Γ' f M T} → Γ' ≡ Γ ∶ f
-                → Γ' ⊢ M ∶ T → Γ ⊢ rename M f ∶ T
-  ≡∶-congr-⊢ bij (⊢-var inc) = ⊢-var (≡∶-∋∶ bij inc)
-  ≡∶-congr-⊢ bij (⊢-abs {T = T} der) = ⊢-abs (≡∶-congr-⊢ (≡∶cnc T =rf (λ _ → =rf) bij) der)
-  ≡∶-congr-⊢ bij (⊢-app der₁ der₂) = ⊢-app (≡∶-congr-⊢ bij der₁) (≡∶-congr-⊢ bij der₂)
 
 
   -- weakening is admissible
@@ -285,11 +293,12 @@ module simpleTT (A : Set) where
   infix 10 _←_∶_
   data _←_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Trm (len Γ')) → Set where
     σ-! : ∀ {Γ' s} → [] ← Γ' ∶ s
-    σ-trm : ∀ {Γ Γ' s s' A M} → (M == s' fz) → (∀ i → s i == s' (fs i))
-                 → Γ ← Γ' ∶ s → Γ' ⊢ M ∶ A → A ∣ Γ ← Γ' ∶ s'
+    σ-trm : ∀ {Γ Γ' s s' T M} → (M == s' fz) → (∀ i → s i == s' (fs i))
+                 → Γ ← Γ' ∶ s → Γ' ⊢ M ∶ T → T ∣ Γ ← Γ' ∶ s'
 
 
   -- substitutions have lengths
+  -- which we never use since it is equal to len Γ
   σ-len : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → Nat
   σ-len σ-! = zero
   σ-len (σ-trm _ _ σs _) = suc (σ-len σs)
@@ -352,11 +361,10 @@ module simpleTT (A : Set) where
   ←∶v-∋∶ σs {i} eq = ⊢∶-∋∶ (σ-∋∶' σs i) eq
 
 
-  -- this term is open: π-∋∶-inv should use that p is injective
-  ←to◂ : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i)
-              → Γ ← Γ' ∶ s → Γ ◂ Γ' ∶ p
-  ←to◂ eq σ-! = π-! _
-  ←to◂ {R ∣ Γ} {Γ'} {p} eq (σ-trm {s = s} {s'} eqz eqs σs der) = π-∋∶-inv aux
+  ←to◂ : ∀ {Γ Γ' p s} → (∀ {i j} → p i == p j → i == j)
+           → (∀ i → var (p i) == s i) → Γ ← Γ' ∶ s → Γ ◂ Γ' ∶ p
+  ←to◂ inj eq σ-! = π-! _
+  ←to◂ {R ∣ Γ} {Γ'} {p} inj eq (σ-trm {s = s} {s'} eqz eqs σs der) = π-∋∶-inv inj aux
     where aux : {i : Fin (suc (len Γ))} {T : Ty} → R ∣ Γ ∋ i ∶ T → Γ' ∋ p i ∶ T
           aux {fz} {T} here = ⊢∶-∋∶ der (eqz • eq fz ⁻¹)
           aux {fs i} {T} (there inc) = ⊢∶-∋∶ (σ-∋∶ σs inc) (eqs i • eq (fs i) ⁻¹)
@@ -369,7 +377,7 @@ module simpleTT (A : Set) where
     where aux : (i : Fin one) → var i == s (fs i)
           aux fz = eqv (fs fz)
   σdiag-π : ∀ {T} → (T ∣ T ∣ []) ◂ (T ∣ []) ∶ pr₁₁
-  σdiag-π = ←to◂ (λ _ → =rf) (σdiag λ _ → =rf)
+  σdiag-π = ←to◂ {!!} (λ _ → =rf) (σdiag λ _ → =rf)
 
   -- term sections are substitutions
   σ-trmsect : ∀ {Γ T M} → Γ ⊢ M ∶ T → T ∣ Γ ← Γ ∶ trmsect M
