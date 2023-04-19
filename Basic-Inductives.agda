@@ -316,6 +316,13 @@ module Basic-Inductives where
   -- Some arithmetic
   -------------------
 
+  one two three four five : Nat
+  one = suc zero
+  two = suc one
+  three = suc two
+  four = suc three
+  five = suc four
+  
   PA4 : ∀ {n} → suc n == zero → N₀
   PA4 p = =transp fam4 p 0₁ 
         where fam4 : Nat → Set

@@ -210,11 +210,17 @@ module Lambda-Calculus where
   wlift-var fz = =rf
   wlift-var (fs i) = =rf
 
-  wlift-var-fn : ∀ {n m} → {f : Fin n → Fin m} → {f' : Fin (suc n) → Fin (suc m)}
+  wlift-var-fnv : ∀ {n m} → {f : Fin n → Fin m} → {f' : Fin (suc n) → Fin (suc m)}
                    → fz == f' fz → (∀ i → fs (f i) == f' (fs i))
-                   → ∀ i → wlift (var ∘ f) i == (var ∘ f') i
-  wlift-var-fn eqz eqs fz = =ap var eqz
-  wlift-var-fn eqz eqs (fs i) = =ap var (eqs i)
+                     → ∀ i → wlift (var ∘ f) i == (var ∘ f') i
+  wlift-var-fnv eqz eqs fz = =ap var eqz
+  wlift-var-fnv eqz eqs (fs i) = =ap var (eqs i)
+
+  wlift-var-fn : ∀ {n m} → {f : Fin n → Fin m} → {g : Fin (suc n) → Trm (suc m)}
+                   → var fz == g fz → (∀ i → var (fs (f i)) == g (fs i))
+                     → ∀ i → wlift (var ∘ f) i == g i
+  wlift-var-fn eqz eqs fz = eqz
+  wlift-var-fn eqz eqs (fs i) = eqs i
 
   -- wlift (trmsect N) : Fin (suc (suc n)) → Trm (suc n)
   -- wlift (trmsect N) : fz ↦ var fz; fs fz ↦ ext N; fs (fs x) ↦ var (fs x)
@@ -736,13 +742,33 @@ module Lambda-Calculus where
   ≡>⋆-has-diamond = rtclosure-diamond _≡>_ ≡>-has-diamond
 
 
+  -------------------------
   -- Church-Rosser Theorem
-
+  -------------------------
   Church-Rosser :  diamond-prop _⟶⋆_
   Church-Rosser {M = M} {N} {L} red₁ red₂ =
     pj1 ≡>⋆snk ,, (≡>⋆<⟶⋆ (prj1 (pj2 ≡>⋆snk)) , ≡>⋆<⟶⋆ (prj2 (pj2 ≡>⋆snk)))
     where ≡>⋆snk : Sink _≡>⋆_ N L
           ≡>⋆snk = ≡>⋆-has-diamond (⟶⋆<≡>⋆ red₁) (⟶⋆<≡>⋆ red₂)
 
+  ----------------
+  -- normal forms
+  ----------------
+
+  is-normal : ∀ {n} → Trm n → Set
+  is-normal M = ∀ N → M ⟶ N → N₀
+
+  data is-value {n : Nat} : Trm n → Set where
+    val-lam : ∀ {M} → is-normal M → is-value (lam M)
+
+  nrm-lam : ∀ {n M} → is-normal {n} (lam M) → is-normal M
+  nrm-lam nrm = λ N stp → nrm (lam N) (βlam stp)
+  nrm-lam-inv : ∀ {n M} → is-normal {suc n} M → is-normal (lam M)
+  nrm-lam-inv nrm (lam N) (βlam stp) = nrm N stp
+  
+  nrm-appₗ : ∀ {n M N} → is-normal {n} (app M N) → is-normal M
+  nrm-appₗ nrm = λ M stp → nrm (app M _) (βappₗ stp)
+  nrm-appᵣ : ∀ {n M N} → is-normal {n} (app M N) → is-normal N
+  nrm-appᵣ nrm = λ N stp → nrm (app _ N) (βappᵣ stp)
 
 -- end file
