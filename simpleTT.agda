@@ -33,6 +33,19 @@ module simpleTT (A : Set) where
     ⊢-abs : ∀ {Γ T S M} → T ∣ Γ ⊢ M ∶ S → Γ ⊢ lam M ∶ T ⇒ S
     ⊢-app : ∀ {Γ T S M N} → Γ ⊢ M ∶ T ⇒ S → Γ ⊢ N ∶ T → Γ ⊢ app M N ∶ S
 
+  ⊢-var-prem : ∀ {T Γ i} → Γ ⊢ var i ∶ T → Γ ∋ i ∶ T
+  ⊢-var-prem (⊢-var inc) = inc
+  ⊢-abs-prem : ∀ {Γ T S M} → Γ ⊢ lam M ∶ T ⇒ S → T ∣ Γ ⊢ M ∶ S
+  ⊢-abs-prem (⊢-abs der) = der
+  -- this one gives back the two premises at once
+  ⊢-app-prem : ∀ {Γ S M N} → Γ ⊢ app M N ∶ S → Σ Ty (λ x → Γ ⊢ M ∶ x ⇒ S × Γ ⊢ N ∶ x)
+  ⊢-app-prem (⊢-app {T = T} der₁ der₂) = T ,, (der₁ , der₂)
+  ⊢-app-premₜ : ∀ {Γ S M N} → Γ ⊢ app M N ∶ S → Ty
+  ⊢-app-premₜ der = pj1 (⊢-app-prem der)
+  ⊢-app-premₗ : ∀ {Γ S M N} → (der : Γ ⊢ app M N ∶ S) → Γ ⊢ M ∶ (⊢-app-premₜ der) ⇒ S
+  ⊢-app-premₗ der = prj1 (pj2 (⊢-app-prem der))
+  ⊢-app-premᵣ : ∀ {Γ S M N} → (der : Γ ⊢ app M N ∶ S) → Γ ⊢ N ∶ (⊢-app-premₜ der)
+  ⊢-app-premᵣ der = prj2 (pj2 (⊢-app-prem der))
 
   -- projections of variables, possibly rearranging occurences of types in contexts
   infix 10 _◂_∶_
@@ -291,8 +304,7 @@ module simpleTT (A : Set) where
   σ-∋∶' : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ i → Γ' ⊢ s i ∶ lst-pr Γ i
   σ-∋∶' σs i = σ-∋∶ σs (varty _ i)
 
-
-  -- extensions of substitution are admissible
+  -- extensions of substitution are substitutions
   σ-frg : ∀ {Γ Γ' s s'} T → (∀ i → ext (s i) == s' i)
             → Γ ← Γ' ∶ s → Γ ← T ∣ Γ' ∶ s'
   σ-frg T eq σ-! =
@@ -312,42 +324,35 @@ module simpleTT (A : Set) where
           (σ-frg T (λ _ → =rf) σs) (wkn-0 T der))
           (⊢-var here)
 
-
-  -- substitution is admissible
-  subst-σ : ∀ {Γ Γ' s A M} → Γ ← Γ' ∶ s → Γ ⊢ M ∶ A → Γ' ⊢ subst-all M s ∶ A
-  subst-σ σs (⊢-var inc) = σ-∋∶ σs inc
-  subst-σ σs (⊢-abs der) = ⊢-abs (subst-σ (σ-wlift _ (λ _ → =rf) σs) der)
-  subst-σ σs (⊢-app der₁ der₂) = ⊢-app (subst-σ σs der₁) (subst-σ σs der₂)
-
-
   -- projections are substitutions
-  ◂to← : ∀ {Γ Γ' p} → Γ ◂ Γ' ∶ p → Γ ← Γ' ∶ (var ∘ p)
-  ◂to← π-∅ =
+  ◂to← : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i) → Γ ◂ Γ' ∶ p → Γ ← Γ' ∶ s
+  ◂to← eq π-∅ =
     σ-!
-  ◂to← (π-frg R eq πp) =
-    σ-frg R (λ i → =ap var (eq i)) (◂to← πp)
-  ◂to← (π-cnc {p = p} {p'} R eqz eqs πp) =
-    σ-wlift R (wlift-var-fn eqz eqs) (◂to← πp)
-  ◂to← (π-swp {p = p} {p'} R S eqz eqsz eqss πp) =
-    σ-trm (=ap var eqz) (λ _ → =rf)
-          (σ-wlift R (wlift-var-fn {f' = p' ∘ fs} eqsz eqss) (σ-frg S (λ _ → =rf) (◂to← πp)))
+  ◂to← eq (π-frg R eqs πp) =
+    σ-frg R (λ i → =ap var (eqs i) • eq i) (◂to← (λ _ → =rf) πp)
+  ◂to← {s = s} eq (π-cnc {p = p} {p'} R eqz eqs πp) =
+    σ-wlift R (wlift-var-fn (=ap var eqz • eq fz) (λ i → =ap var (eqs i) • eq (fs i)))
+            (◂to← (λ _ → =rf) πp)
+  ◂to← eq (π-swp {p = p} {p'} R S eqz eqsz eqss πp) =
+    σ-trm (=ap var eqz • eq fz) (λ _ → =rf)
+          (σ-wlift R (wlift-var-fn (=ap var eqsz • eq (fs fz))
+                                   (λ i → =ap var (eqss i) • eq (fs (fs i))))
+                     (σ-frg S (λ _ → =rf)
+                     (◂to← (λ _ → =rf) πp)))
           (⊢-var (there here))
 
 
   σ-id : ∀ {Γ} → Γ ← Γ ∶ var
-  σ-id {[]} = σ-!
-  σ-id {R ∣ Γ} = σ-trm =rf (λ _ → =rf) (◂to← π-dsp) (⊢-var here)
+  σ-id {Γ} = ◂to← (λ i → =rf) π-id
 
   σ-rfl : ∀ {Γ s} → (∀ i → var i == s i) → Γ ← Γ ∶ s
-  σ-rfl {[]} eqp = σ-!
-  σ-rfl {R ∣ Γ} eqp = σ-trm (eqp fz) (λ i → eqp (fs i)) (◂to← π-dsp) (⊢-var here)
+  σ-rfl {Γ} eq = ◂to← eq (π-rfl (λ _ → =rf))
 
   ←∶v-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {i j} → s i == var j → Γ' ∋ j ∶ lst-pr Γ i
   ←∶v-∋∶ σs {i} eq = ⊢∶-∋∶ (σ-∋∶' σs i) eq
 
 
-  -- HOW is this possible? Need to use that p (eqv. s) is injective
-  -- in fact, π-∋∶-inv should use that p is injective
+  -- this term is open: π-∋∶-inv should use that p is injective
   ←to◂ : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i)
               → Γ ← Γ' ∶ s → Γ ◂ Γ' ∶ p
   ←to◂ eq σ-! = π-! _
@@ -356,17 +361,63 @@ module simpleTT (A : Set) where
           aux {fz} {T} here = ⊢∶-∋∶ der (eqz • eq fz ⁻¹)
           aux {fs i} {T} (there inc) = ⊢∶-∋∶ (σ-∋∶ σs inc) (eqs i • eq (fs i) ⁻¹)
 
-  -- the substitution (pr₁₁ : 0₂, 1₂ ⊢> 0₁) below should NOT be a projection
-  one two : Nat
-  one = suc zero
-  two = suc one
+  -- the substitution var ∘ pr₁₁ where (pr₁₁ : 0₂, 1₂ ⊢> 0₁), should NOT be a projection
   pr₁₁ : Fin two → Fin one
   pr₁₁ i = fz
   σdiag : ∀ {T s} → (∀ i → var fz == s i) → (T ∣ T ∣ []) ← (T ∣ []) ∶ s
   σdiag {T} {s} eqv = σ-trm (eqv fz) aux σ-id (⊢-var here)
-    where aux : (i : Fin (suc zero)) → var i == s (fs i)
+    where aux : (i : Fin one) → var i == s (fs i)
           aux fz = eqv (fs fz)
   σdiag-π : ∀ {T} → (T ∣ T ∣ []) ◂ (T ∣ []) ∶ pr₁₁
   σdiag-π = ←to◂ (λ _ → =rf) (σdiag λ _ → =rf)
+
+  -- term sections are substitutions
+  σ-trmsect : ∀ {Γ T M} → Γ ⊢ M ∶ T → T ∣ Γ ← Γ ∶ trmsect M
+  σ-trmsect der = σ-trm =rf (λ _ → =rf) σ-id der
+
+
+  -- substitution is admissible
+  σ-subst-all : ∀ {Γ Γ' s T M} → Γ ← Γ' ∶ s → Γ ⊢ M ∶ T → Γ' ⊢ subst-all M s ∶ T
+  σ-subst-all σs (⊢-var inc) = σ-∋∶ σs inc
+  σ-subst-all σs (⊢-abs der) = ⊢-abs (σ-subst-all (σ-wlift _ (λ _ → =rf) σs) der)
+  σ-subst-all σs (⊢-app der₁ der₂) = ⊢-app (σ-subst-all σs der₁) (σ-subst-all σs der₂)
+
+  σ-subst-0 : ∀ {Γ R T M N} → Γ ⊢ N ∶ R → R ∣ Γ ⊢ M ∶ T → Γ ⊢ subst-0 M N ∶ T
+  σ-subst-0 der₁ der₂ = σ-subst-all (σ-trmsect der₁) der₂
+
+
+  ---------------------
+  -- subject reduction
+  ---------------------
+  subj-red : ∀ {Γ T M N} → Γ ⊢ M ∶ T → M ⟶ N → Γ ⊢ N ∶ T
+  subj-red {M = app (lam M) N} {.(subst-all M (trmsect N))} der (β M N) =
+    σ-subst-0 (⊢-app-premᵣ der) (⊢-abs-prem (⊢-app-premₗ der))
+  subj-red {M = lam M} {lam N} (⊢-abs der) (βlam stp) =
+    ⊢-abs (subj-red der stp)
+  subj-red {M = app M L} {app N L} (⊢-app der₁ der₂) (βappₗ stp) =
+    ⊢-app (subj-red der₁ stp) der₂
+  subj-red {M = app L M} {app L N} (⊢-app der₁ der₂) (βappᵣ stp) =
+    ⊢-app der₁ (subj-red der₂ stp)
+
+
+  -- lam M is a canonical form
+  lam-is-canf : ∀ {Γ T S M} → Γ ⊢ M ∶ T ⇒ S → is-value M
+                  → Σ (Trm (suc (len Γ))) (λ x → lam x == M)
+  lam-is-canf der (val-lam {M'} nrm') = M' ,, =rf
+
+
+  -- progress
+  progr : ∀ {T M} → [] ⊢ M ∶ T → is-normal M → is-value M
+  progr (⊢-abs der) nrm = val-lam (nrm-lam nrm)
+  progr {T} (⊢-app {M = M} {N} der₁ der₂) nrm = N₀ind (nrm (subst-0 M' N) stp')
+    where nrmM : is-normal M
+          nrmM = nrm-appₗ nrm
+          M' : Trm one
+          M' = pj1 (lam-is-canf der₁ (progr der₁ nrmM))
+          λ=M : lam M' == M
+          λ=M = pj2 (lam-is-canf der₁ (progr der₁ nrmM))
+          stp' : app M N ⟶ subst-0 M' N
+          stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
+          
 
 -- end file
