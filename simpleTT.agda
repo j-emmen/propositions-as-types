@@ -12,8 +12,16 @@ module simpleTT (A : Set) where
     atm : A → Ty
     _⇒_ : Ty → Ty → Ty
 
+  -- contexts are (finite) lists of types
   Ctx : Set
   Ctx = List Ty
+  len : Ctx → Nat
+  len = lenList {A = Ty}
+  pr : (Γ : Ctx) → Fin (len Γ) → Ty
+  pr = prList {A = Ty}
+  
+  fnc2Ctx : ∀ {n} → (Fin n → Ty) → Σ[ Ctx ] (λ x → n == len x)
+  fnc2Ctx = fnct-to-List {A = Ty}
   
 
   -- Γ ∋ i ∶ T inhabited if T occurs in Γ in the i-th position
@@ -22,7 +30,7 @@ module simpleTT (A : Set) where
     here  : ∀ {T Γ} → T ∣ Γ ∋ fz ∶ T
     there : ∀ {T S Γ i} → Γ ∋ i ∶ T → S ∣ Γ ∋ fs i ∶ T
 
-  varty : ∀ Γ i → Γ ∋ i ∶ lst-pr Γ i
+  varty : ∀ Γ i → Γ ∋ i ∶ pr Γ i
   varty (R ∣ Γ) fz = here
   varty (R ∣ Γ) (fs i) = there (varty Γ i)
 
@@ -38,7 +46,7 @@ module simpleTT (A : Set) where
   ⊢-abs-prem : ∀ {Γ T S M} → Γ ⊢ lam M ∶ T ⇒ S → T ∣ Γ ⊢ M ∶ S
   ⊢-abs-prem (⊢-abs der) = der
   -- this one gives back the two premises at once
-  ⊢-app-prem : ∀ {Γ S M N} → Γ ⊢ app M N ∶ S → Σ Ty (λ x → Γ ⊢ M ∶ x ⇒ S × Γ ⊢ N ∶ x)
+  ⊢-app-prem : ∀ {Γ S M N} → Γ ⊢ app M N ∶ S → Σ[ Ty ] (λ x → Γ ⊢ M ∶ x ⇒ S × Γ ⊢ N ∶ x)
   ⊢-app-prem (⊢-app {T = T} der₁ der₂) = T ,, (der₁ , der₂)
   ⊢-app-premₜ : ∀ {Γ S M N} → Γ ⊢ app M N ∶ S → Ty
   ⊢-app-premₜ der = pj1 (⊢-app-prem der)
@@ -310,7 +318,7 @@ module simpleTT (A : Set) where
   σ-∋∶ (σ-trm eqz eqs σs der) here = ⊢∶-= eqz  der
   σ-∋∶ (σ-trm eqz eqs σs der) {fs i} (there inc) = ⊢∶-= (eqs i) (σ-∋∶ σs inc)
 
-  σ-∋∶' : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ i → Γ' ⊢ s i ∶ lst-pr Γ i
+  σ-∋∶' : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ i → Γ' ⊢ s i ∶ pr Γ i
   σ-∋∶' σs i = σ-∋∶ σs (varty _ i)
 
   -- extensions of substitution are substitutions
@@ -357,7 +365,7 @@ module simpleTT (A : Set) where
   σ-rfl : ∀ {Γ s} → (∀ i → var i == s i) → Γ ← Γ ∶ s
   σ-rfl {Γ} eq = ◂to← eq (π-rfl (λ _ → =rf))
 
-  ←∶v-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {i j} → s i == var j → Γ' ∋ j ∶ lst-pr Γ i
+  ←∶v-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {i j} → s i == var j → Γ' ∋ j ∶ pr Γ i
   ←∶v-∋∶ σs {i} eq = ⊢∶-∋∶ (σ-∋∶' σs i) eq
 
 
@@ -410,7 +418,7 @@ module simpleTT (A : Set) where
 
   -- lam M is a canonical form
   lam-is-canf : ∀ {Γ T S M} → Γ ⊢ M ∶ T ⇒ S → is-value M
-                  → Σ (Trm (suc (len Γ))) (λ x → lam x == M)
+                  → Σ[ Trm (suc (len Γ)) ] (λ x → lam x == M)
   lam-is-canf der (val-lam {M'} nrm') = M' ,, =rf
 
 
@@ -426,6 +434,41 @@ module simpleTT (A : Set) where
           λ=M = pj2 (lam-is-canf der₁ (progr der₁ nrmM))
           stp' : app M N ⟶ subst-0 M' N
           stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
-          
 
+  -- reducibility candidates
+  data red-cand-app {n} (M : Trm n) : (T : Ty) → Set where
+
+{-
+  -- this definition makes red-can not strictly positive
+  data red-cand {n} (M : Trm n) : (T : Ty) → Set where
+    rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
+    rc-⇒ : ∀ {T S} → (∀ {N} → red-can {n} N T → red-cand (app M N) S) → red-cand M (T ⇒ S)
+-}
+
+  data red-cand {n} (M : Trm n) : (T : Ty) → Set where
+    rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
+    -- not the right definition: there should be red-cand {n} N T instead of the typing judgement
+    rc-⇒ : ∀ {T S} → (∀ {N} → (f : Fin n → Ty)
+             → pj1 (fnc2Ctx f) ⊢ =transp Trm (pj2 (fnc2Ctx f)) N ∶ T → red-cand (app M N) S)
+                → red-cand M (T ⇒ S)
+
+  data is-neutral {n} : Trm n → Set where
+    neu-var : ∀ {i} → is-neutral (var i)
+    neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
+
+  red-cand-Props : Ty → ∀ {n} → Trm n → Set
+  red-cand-Props T M = (red-cand M T → isStrNrm M)
+                       × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T)
+                       × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
+
+  red-cand-props : ∀ T {n} M → red-cand-Props T {n} M
+  red-cand-props (atm a) M =
+    rc-atm-inv
+    , (λ rc stp → rc-atm (strnrm-⟶ (rc-atm-inv rc) stp))
+    , {!!}
+    where rc-atm-inv : red-cand M (atm a) → isStrNrm M
+          rc-atm-inv (rc-atm nrm) = nrm
+
+  red-cand-props (T ⇒ S) M = {!!}
+  
 -- end file

@@ -335,7 +335,7 @@ module Lambda-Calculus where
 
   Sink : (R : {n : Nat} → Trm n → Trm n → Set)
                → ∀ {n} → (N L : Trm n) → Set
-  Sink R {n} N L = Σ (Trm n) (λ x → R N x × R L x)
+  Sink R {n} N L = Σ[ Trm n ] (λ x → R N x × R L x)
 
   ⋄trm : (R : {n : Nat} → Trm n → Trm n → Set)
             → {n : Nat} → {N L : Trm n} → Sink R N L → Trm n
@@ -365,12 +365,12 @@ module Lambda-Calculus where
   
   rtclosure-diamond-aux : (R : {n : Nat} → Trm n → Trm n → Set)
                              → diamond-prop R → ∀ {n M N L} → refl-trans-clos R M N → R M L
-                               → Σ (Trm n) (λ x → R N x × refl-trans-clos R L x)
+                               → Σ[ Trm n ] (λ x → R N x × refl-trans-clos R L x)
   rtclosure-diamond-aux R diam {N = M} {L} (tcrfl M) r =
     L ,, (r , tcrfl L)
   rtclosure-diamond-aux R diam {N = N} {L} (tccnc {M} {N'} red r') r =
     ⋄trm R snkR ,, (⋄red₁ R snkR , tccnc (prj2 (pj2 snk)) (⋄red₂ R snkR))
-    where snk : Σ (Trm _) (λ x → R N' x × refl-trans-clos R L x)
+    where snk : Σ[ Trm _ ] (λ x → R N' x × refl-trans-clos R L x)
           snk = rtclosure-diamond-aux R diam red r 
           snkR : Sink R N (pj1 snk)
           snkR = diam r' (prj1 (pj2 snk))
@@ -384,7 +384,7 @@ module Lambda-Calculus where
                 , prj2 (pj2 snk2))
     where snk1 : Sink (refl-trans-clos R) N N'
           snk1 = rtclosure-diamond R diam red₁ red₂
-          snk2 : Σ (Trm _) (λ x → R (pj1 snk1) x × refl-trans-clos R L x)
+          snk2 : Σ[ Trm _ ] (λ x → R (pj1 snk1) x × refl-trans-clos R L x)
           snk2 = rtclosure-diamond-aux R diam (prj2 (pj2 snk1)) r
 
 
@@ -770,5 +770,39 @@ module Lambda-Calculus where
   nrm-appₗ nrm = λ M stp → nrm (app M _) (βappₗ stp)
   nrm-appᵣ : ∀ {n M N} → is-normal {n} (app M N) → is-normal N
   nrm-appᵣ nrm = λ N stp → nrm (app _ N) (βappᵣ stp)
+
+  data isStrNrmₗₑᵥ {n : Nat} : Nat → Trm n → Set where
+    strnrm-nrm : ∀ {M} → is-normal M → isStrNrmₗₑᵥ zero M
+    strnrm-stp : ∀ {k M} → (∀ {N} → M ⟶ N → isStrNrmₗₑᵥ k N) → isStrNrmₗₑᵥ (suc k) M
+
+  isStrNrm : ∀ {n} → Trm n → Set
+  isStrNrm M = Σ[ Nat ] (λ x → isStrNrmₗₑᵥ x M)
+
+  strnrm-upw : ∀ {n k M} → isStrNrmₗₑᵥ {n} k M → ∀ {l} → k ≤N l → isStrNrmₗₑᵥ l M
+  strnrm-upw (strnrm-nrm nrmM) {zero} dq = strnrm-nrm nrmM
+  strnrm-upw (strnrm-nrm nrmM) {suc l} dq = strnrm-stp (λ {N} stp → N₀ind (nrmM N stp))
+  strnrm-upw (strnrm-stp snstp) {suc l} dq = strnrm-stp (λ {N} stp → strnrm-upw (snstp stp) dq)
+
+  strnrm-⟶ₗₑᵥ : ∀ {k n M N} → isStrNrmₗₑᵥ {n} k M → M ⟶ N → isStrNrm N
+  strnrm-⟶ₗₑᵥ (strnrm-nrm nrmM) stp = N₀ind (nrmM _ stp)
+  strnrm-⟶ₗₑᵥ {k = suc k} (strnrm-stp snstp) stp = k ,, snstp stp
+
+  strnrm-⟶ : ∀ {n M N} → isStrNrm {n} M → M ⟶ N → isStrNrm N
+  strnrm-⟶ {n} snM = strnrm-⟶ₗₑᵥ (pj2 snM)
+
+  -- need to take the max of a finite set
+  strnrm-⟶-inv : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm N) → isStrNrm {n} M
+  strnrm-⟶-inv pf = {!!}
+
+
+{-
+  strnrm-any-stp : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm {n} N)
+                     → ∀ {N} → M ⟶ N → isStrNrm M
+  strnrm-any-stp {n} snstp stp =
+    suc (pj1 (snstp stp)) ,, strnrm-stp (λ stp' → {!pj2 (snstp stp)!})
+    where aux :  ∀ M → (∀ {N} → M ⟶ N → isStrNrm {n} N) → Nat
+          aux = {!!}
+-}
+
 
 -- end file
