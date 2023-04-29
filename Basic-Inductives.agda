@@ -29,7 +29,7 @@ module Basic-Inductives where
   prj2 : {A : Set} → {B : Set}  → A × B → B
   prj2 (a , b) = b
 
-  infix 3 _,,_ Σ[_]_
+  infix 4 _,,_ Σ[_]_
   data Σ[_]_ (A : Set) (B : A → Set) : Set where
     _,,_ : (a : A) → B a → Σ[ A ] B
   pj1 : {A : Set} → {B : A → Set} → Σ[ A ] B → A
@@ -38,14 +38,19 @@ module Basic-Inductives where
   pj2 (a ,, b) = b
 
   -- sums
-  infix 3 _+_ [_,_]
+  infixr 3 _+_ [_∣_]
   data _+_ (A : Set) (B : Set) : Set where
     inl : A → A + B
     inr : B → A + B
 
-  [_,_] : ∀ {A B C : Set} → (A → C) → (B → C) → A + B → C
-  [ f , g ] (inl a) = f a
-  [ f , g ] (inr b) = g b
+  [_∣_] : ∀ {A B C : Set} → (A → C) → (B → C) → A + B → C
+  [ f ∣ g ] (inl a) = f a
+  [ f ∣ g ] (inr b) = g b
+
+  +rec3 : ∀ {A B C D : Set} → (A → D) → (B → D) → (C → D) → A + B + C → D
+  +rec3 f g h (inl a) = f a
+  +rec3 f g h (inr (inl b)) = g b
+  +rec3 f g h (inr (inr c)) = h c
 
   +ind : ∀ {A B : Set} → (C : A + B → Set ) → (∀ a → C (inl a)) → (∀ b → C (inr b))
            → ∀ x → C x
@@ -267,7 +272,7 @@ module Basic-Inductives where
   isProp A = (a a' : A) → a == a'
 
 {-
-  -- need function extensionality
+  -- need function extensionality..?
   ∀isprop : ∀ {A} (B : A → Set) → (∀ a → isProp (B a)) → isProp (∀ a → B a)
   ∀isprop B isp b b' = {!!}
     where ptw : ∀ a → b a == b' a
@@ -290,7 +295,6 @@ module Basic-Inductives where
   is-equiv f = ∀ b → isContr (fib f b)
 
 {-
-  -- need function extensionality
   is-equiv-is-Prop : ∀ {A B f} → isProp (is-equiv {A} {B} f)
   is-equiv-is-Prop {A} {B} {f} = {! ∀isprop!}
 -}  
@@ -315,6 +319,26 @@ module Basic-Inductives where
                                  → (b : B) → prj2 z == b → z == (a , b)
                      auxAB {z = z} pf₁ = =J (λ a' pf' → (b' : _) → prj2 z == b' → z == (a' , b'))
                                             (auxB) pf₁
+
+  Ση : ∀ {A} {B : A → Set}(z : Σ[ A ] B) → (pj1 z) ,, (pj2 z) == z
+  Ση (a ,, b) = =rf
+
+  Ση⁻¹ : ∀ {A} {B : A → Set}(z : Σ[ A ] B) → z == (pj1 z) ,, (pj2 z)
+  Ση⁻¹ (a ,, b) = =rf
+
+
+  =Σchar,, : ∀ {A} {B : A → Set} {z : Σ[ A ] B} {a'}
+               → (u : pj1 z == a') → ∀ {b'} → (B ● u) (pj2 z) == b'
+                 → z == a' ,, b'
+  =Σchar,, {A} {B} {z} {a'} =
+    =J (λ x y → ∀ {b'} → ((B ● y) (pj2 z)) == b' → z == x ,, b')
+       (=J (λ w _ → z == pj1 z ,, w) (Ση⁻¹ z))
+
+  =Σchar : ∀ {A} {B : A → Set}{z z' : Σ[ A ] B}
+               → (u : pj1 z == pj1 z') → (B ● u) (pj2 z) == pj2 z'
+                 → z == z'
+  =Σchar {z = z} {a' ,, b'} u = =Σchar,, {z = z} {a'} u {b'}
+
 
   -- UIP stuff
   UIP UIPrf  : (A : Set) → Set
@@ -371,6 +395,16 @@ module Basic-Inductives where
   suc-inj : ∀ {n m} → suc n == suc m → n == m
   suc-inj {n} {m} p = =ap prdc p
 
+  infixr 10 _+N_
+  _+N_ : Nat → Nat → Nat
+  zero +N m = m
+  suc n +N m = suc (n +N m)
+
+  sum-succNat : ∀{n} → (f : Fin (suc n) → Nat) → Nat
+  sum-succNat {zero} f = f fz
+  sum-succNat {suc n} f = f fz +N sum-succNat (f ∘ fs)
+
+  -- order on Nat
   infix 5 _≤N_
   _≤N_ : Nat → Nat → Set
   zero ≤N m = N₁
@@ -428,16 +462,52 @@ module Basic-Inductives where
                            fam4 fz = N₁
                            fam4 (fs i) = N₀
 
-  is-finite : Set → Set
-  is-finite A = Σ[ Nat ] (λ n → Σ[ (Fin n → A) ] is-equiv)
+  Fin+N-fnc : ∀ {n m} {A : Set} → (Fin n → A) → (Fin m → A) → Fin (n +N m) → A
+  Fin+N-fnc {zero} lt rt             = rt
+  Fin+N-fnc {suc n} lt rt fz         = lt fz
+  Fin+N-fnc {suc n} lt rt (fs i)     = Fin+N-fnc (lt ∘ fs) rt i
+
+  Fin+N-inl : ∀ {n m} → Fin n → Fin (n +N m)
+  Fin+N-inl {zero} = N₀ind
+  Fin+N-inl {suc n} fz        = fz
+  Fin+N-inl {suc n} (fs i)    = fs (Fin+N-inl i)
+
+  Fin+N-inr : ∀ {n m} → Fin m → Fin (n +N m)
+  Fin+N-inr {zero} {m}      = id
+  Fin+N-inr {suc n} {m}     = fs ∘ Fin+N-inr {n} {m}
+
+  Fin+N-trl : ∀ {n m} {A : Set} → (lt : Fin n → A) → (rt : Fin m → A)
+                → ∀ i → Fin+N-fnc lt rt (Fin+N-inl i) == lt i
+  Fin+N-trl {suc n} lt rt fz          = =rf {a = lt fz}
+  Fin+N-trl {suc n} lt rt (fs i)      = Fin+N-trl (lt ∘ fs) rt i
+
+  Fin+N-trr : ∀ {n m} {A : Set} → (lt : Fin n → A) → (rt : Fin m → A)
+                → ∀ i → Fin+N-fnc lt rt (Fin+N-inr i) == rt i
+  Fin+N-trr {zero} lt rt i           = =rf {a = rt i}
+  Fin+N-trr {suc n} lt rt i          = Fin+N-trr (lt ∘ fs) rt i
+
+  Fin+N-ind : ∀ {n m} (C : Fin (n +N m) → Set)
+                → (∀ i → C (Fin+N-inl {n} i)) → (∀ i → C (Fin+N-inr {m = m} i))
+                  → ∀ i → C i
+  Fin+N-ind {zero} {m} C lt rt            = rt
+  Fin+N-ind {suc n} {m} C lt rt fz        = lt fz
+  Fin+N-ind {suc n} {m} C lt rt (fs i)    = Fin+N-ind (λ x → C (fs x)) (λ x → lt (fs x)) rt i
+
+  Fin+N-indl : ∀ {n m} {C : Fin (n +N m) → Set}
+                 → (lt : ∀ i → C (Fin+N-inl {n} i)) → (rt : ∀ i → C (Fin+N-inr {m = m} i))
+                   → ∀ i → Fin+N-ind C lt rt (Fin+N-inl i) == lt i
+  Fin+N-indl {suc n} {m} {C} lt rt fz           = =rf {a = lt fz}
+  Fin+N-indl {suc n} {m} {C} lt rt (fs i)       = Fin+N-indl (λ x → lt (fs x)) rt i
+
+  Fin+N-indr : ∀ {n m} {C : Fin (n +N m) → Set}
+                 → (lt : ∀ i → C (Fin+N-inl {n} i)) → (rt : ∀ i → C (Fin+N-inr {m = m} i))
+                   → ∀ i → Fin+N-ind C lt rt (Fin+N-inr i) == rt i
+  Fin+N-indr {zero} {m} {C} lt rt i           = =rf {a = rt i}
+  Fin+N-indr {suc n} {m} {C} lt rt i          = Fin+N-indr (λ x → lt (fs x)) rt i
+
 
   is-maxN-2 : ∀ n m → Nat → Set
   is-maxN-2 n m = λ x → n ≤N x × m ≤N x × (∀ {l} → n ≤N l → m ≤N l → x ≤N l)
-
---  suc-maxN-2 : ∀ {n m} → is-maxN-2 (suc n) (suc m) (suc )
-  
-  is-maxN-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → (iₘₓ : Fin (suc n)) → Set
-  is-maxN-Fin f iₘₓ = (∀ i → f i ≤N f iₘₓ)
 
   max≤N-2 : ∀ n m → Σ[ Nat ] (is-maxN-2 n m)
   max≤N-2 zero m =
@@ -451,7 +521,11 @@ module Basic-Inductives where
           aux : {l : Nat} → suc n ≤N l → suc m ≤N l → suc (pj1 ih) ≤N l
           aux {suc l} = prj2 (prj2 (pj2 ih)) {l}
 
+  
+  is-maxN-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → (iₘₓ : Fin (suc n)) → Set
+  is-maxN-Fin f iₘₓ = (∀ i → f i ≤N f iₘₓ)
 
+{-
   max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ[ Fin (suc n) ] (is-maxN-Fin f)
   max≤N-Fin {zero} f = fz ,, λ i → =2≤N (=ap f (pj2 (N₁-isContr) i))
   max≤N-Fin {suc n} f = {!max≤N-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz)!} ,, {!!}
@@ -460,7 +534,7 @@ module Basic-Inductives where
           iₘₓ : Σ[ Fin (suc (suc n)) ] (λ x → f x == pj1 mxN)
           iₘₓ = {!!}
           -- need to do it by induction on n, so not here
-          
+-}          
 
 {-
   sup-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ (Fin (suc n)) (is-maxN-of f)
@@ -470,6 +544,13 @@ module Basic-Inductives where
           sup-ffs = {!!} --sup-Fin (f ∘ fs)
 -}          
 
+
+  is-finite : Set → Set
+  is-finite A = Σ[ Nat ] (λ n → Σ[ (Fin n → A) ] is-equiv)
+
+  is-finite-bound : Set → Set
+  is-finite-bound A = Σ[ Nat ] (λ n → Σ[ ((Fin n → A) × (A → Fin n)) ]
+                                          (λ x → ∀ a → prj1 x (prj2 x a) == a))
 
 
   miss-Fin : ∀ {n} → (i : Fin (suc n))
@@ -502,6 +583,7 @@ module Basic-Inductives where
                            (f i)
                            (λ j → {!!})
 -}
+
 
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation
