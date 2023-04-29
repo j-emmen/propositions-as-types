@@ -424,7 +424,12 @@ module Basic-Inductives where
 
   =2≤N : ∀ {n m} → n == m → n ≤N m
   =2≤N {n} eq = =transp (n ≤N_) eq (≤N-rfl {n})
+  =≤N : ∀ {n n' m} → n == n' → n' ≤N m → n ≤N m
+  =≤N {m = m} eq = =transp (_≤N m) (eq ⁻¹)
+  ≤N= : ∀ {n m m'} → n ≤N m → m == m' → n ≤N m'
+  ≤N= {n} dq eq = =transp (n ≤N_) eq dq
   
+    
   ≤N-trn : ∀ {n m l} → n ≤N m → m ≤N l → n ≤N l
   ≤N-trn {zero} dq₁ dq₂ = 0₁
   ≤N-trn {suc n} {suc m} {suc l} dq₁ dq₂ = ≤N-trn {n} {m} {l} dq₁ dq₂
@@ -505,7 +510,7 @@ module Basic-Inductives where
   Fin+N-indr {zero} {m} {C} lt rt i           = =rf {a = rt i}
   Fin+N-indr {suc n} {m} {C} lt rt i          = Fin+N-indr (λ x → lt (fs x)) rt i
 
-
+  -- max of finite stuff
   is-maxN-2 : ∀ n m → Nat → Set
   is-maxN-2 n m = λ x → n ≤N x × m ≤N x × (∀ {l} → n ≤N l → m ≤N l → x ≤N l)
 
@@ -521,28 +526,34 @@ module Basic-Inductives where
           aux : {l : Nat} → suc n ≤N l → suc m ≤N l → suc (pj1 ih) ≤N l
           aux {suc l} = prj2 (prj2 (pj2 ih)) {l}
 
+  max≤N-2-EM : ∀ n m → (pj1 (max≤N-2 n m) == n) + (pj1 (max≤N-2 n m) == m)
+  max≤N-2-EM zero m = inr =rf
+  max≤N-2-EM (suc n) zero = inl =rf
+  max≤N-2-EM (suc n) (suc m) = [ inl ∘ =ap suc ∣ inr ∘ =ap suc ] (max≤N-2-EM n m)
   
-  is-maxN-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → (iₘₓ : Fin (suc n)) → Set
-  is-maxN-Fin f iₘₓ = (∀ i → f i ≤N f iₘₓ)
+  is-max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → (iₘₓ : Fin (suc n)) → Set
+  is-max≤N-Fin f iₘₓ = (∀ i → f i ≤N f iₘₓ)
 
-{-
-  max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ[ Fin (suc n) ] (is-maxN-Fin f)
+  max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ[ Fin (suc n) ] (is-max≤N-Fin f)
   max≤N-Fin {zero} f = fz ,, λ i → =2≤N (=ap f (pj2 (N₁-isContr) i))
-  max≤N-Fin {suc n} f = {!max≤N-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz)!} ,, {!!}
-    where mxN : Σ[ Nat ] (is-maxN-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz))
-          mxN = max≤N-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz)
+  max≤N-Fin {suc n} f = pj1 iₘₓ ,, i-ismax
+    where mxffs : Σ[ Fin (suc n) ] (is-max≤N-Fin (f ∘ fs))
+          mxffs = max≤N-Fin (f ∘ fs)
+          mxN : Σ[ Nat ] (is-maxN-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz))
+          mxN = max≤N-2 (f (fs (pj1 mxffs))) (f fz)
           iₘₓ : Σ[ Fin (suc (suc n)) ] (λ x → f x == pj1 mxN)
-          iₘₓ = {!!}
-          -- need to do it by induction on n, so not here
--}          
-
-{-
-  sup-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ (Fin (suc n)) (is-maxN-of f)
-  sup-Fin {zero} f = fz ,, {!!} --N₁ind (≤N-rfl {f fz})
-  sup-Fin {suc n} f = {!pj1 sup-ffs!} ,, {!!}
-    where sup-ffs : Σ (Fin (suc n)) (λ x → (i : Fin (suc n)) → f (fs i) ≤N f (fs x))
-          sup-ffs = {!!} --sup-Fin (f ∘ fs)
--}          
+          iₘₓ = [ f₁ ∣ f₂ ] (max≤N-2-EM (f (fs (pj1 mxffs))) (f fz))
+            where f₁ : pj1 (max≤N-2 (f (fs (pj1 mxffs))) (f fz)) == f (fs (pj1 mxffs))
+                           → Σ[ Fin (two +N n) ] (λ x → f x == pj1 mxN)
+                  f₁ eq = fs (pj1 mxffs) ,, eq ⁻¹
+                  f₂ : pj1 (max≤N-2 (f (fs (pj1 mxffs))) (f fz)) == f fz
+                           → Σ[ Fin (suc (suc n)) ] (λ x → f x == pj1 mxN)
+                  f₂ eq = fz ,, eq ⁻¹
+          i-ismax : ∀ i → f i ≤N f (pj1 iₘₓ)
+          i-ismax fz = ≤N= {f fz} {pj1 mxN} {f (pj1 iₘₓ)} (prj1 (prj2 (pj2 mxN))) (pj2 iₘₓ ⁻¹)
+          i-ismax (fs i) = ≤N-trn {f (fs i)} {f (fs (pj1 mxffs))} {f (pj1 iₘₓ)}
+                                  (pj2 mxffs i) (≤N= {f (fs (pj1 mxffs))} {pj1 mxN} (prj1 (pj2 mxN))
+                                                                                    (pj2 iₘₓ ⁻¹))
 
 
   is-finite : Set → Set
