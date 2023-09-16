@@ -1,4 +1,4 @@
-
+{-# OPTIONS --allow-unsolved-metas #-}
 
 module Lambda-Calculus where
   open import Basic-Inductives
@@ -41,6 +41,79 @@ module Lambda-Calculus where
     var : ∀ {n} → Fin n → Trm n
     lam : ∀ {n} → Trm (suc n) → Trm n
     app : ∀ {n} → Trm n → Trm n → Trm n
+
+  var-inj : ∀ {n i j} → var {n} i == var j → i == j
+  var-inj =rf = =rf
+  lam-inj : ∀ {n M N} → lam {n} M == lam N → M == N
+  lam-inj =rf = =rf
+  app-inj : ∀ {n M₁ M₂ N₁ N₂} → app {n} M₁ M₂ == app N₁ N₂ → (M₁ == N₁) × (M₂ == N₂)
+  app-inj =rf = =rf , =rf
+  app-injₗ : ∀ {n M₁ M₂ N₁ N₂} → app {n} M₁ M₂ == app N₁ N₂ → M₁ == N₁
+  app-injₗ = prj1 ∘ app-inj
+  app-injᵣ : ∀ {n M₁ M₂ N₁ N₂} → app {n} M₁ M₂ == app N₁ N₂ → M₂ == N₂
+  app-injᵣ = prj2 ∘ app-inj
+  
+  var≠lam : ∀ {n} i M → ¬ (var {n} i == lam M)
+  var≠lam {n} i M = λ u → (fam ● u) 0₁
+    where fam : Trm n → Set
+          fam (var j) = N₁
+          fam (lam P) = N₀
+          fam (app P₁ P₂) = N₀
+  lam≠var : ∀ {n} M i → ¬ (lam M == var {n} i)
+  lam≠var {n} M i = ¬=sym (var≠lam i M)
+
+  var≠app : ∀ {n} i M N → ¬ (var {n} i == app M N)
+  var≠app {n} i M N = λ u → (fam ● u) 0₁
+    where fam : Trm n → Set
+          fam (var j) = N₁
+          fam (lam P) = N₀
+          fam (app P₁ P₂) = N₀  
+  app≠var : ∀ {n} M N i → ¬ (app M N == var {n} i)
+  app≠var {n} M N i = ¬=sym (var≠app i M N)
+
+  lam≠app : ∀ {n} P M N → ¬ (lam {n} P == app M N)
+  lam≠app {n} P M N = λ u → (fam ● u) 0₁
+    where fam : Trm n → Set
+          fam (var j) = N₀
+          fam (lam P) = N₁
+          fam (app P₁ P₂) = N₀
+  app≠lam : ∀ {n} M N P → ¬ (app M N == lam {n} P)
+  app≠lam M N P = ¬=sym (lam≠app P M N)
+
+  Trm-is-decid : ∀ {n} (M N : Trm n) → (M == N) + (¬ (M == N))
+  Trm-is-decid (var i) (var j) =
+    [ inl ∘ =ap var ∣ (λ nu → inr (nu ∘ var-inj)) ] (Fin-is-decid i j)
+  Trm-is-decid (var i) (lam N) =
+    inr (var≠lam i N)
+  Trm-is-decid (var i) (app N₁ N₂) =
+    inr (var≠app i N₁ N₂)
+  Trm-is-decid (lam M) (var j) =
+    inr (lam≠var M j)
+  Trm-is-decid (lam M) (lam N) =
+    [ inl ∘ =ap lam ∣ (λ ne → inr (ne ∘ lam-inj)) ] (Trm-is-decid M N)
+  Trm-is-decid (lam M) (app N₁ N₂) =
+    inr (lam≠app M N₁ N₂)
+  Trm-is-decid (app M₁ M₂) (var j) =
+    inr (app≠var M₁ M₂ j)
+  Trm-is-decid (app M₁ M₂) (lam N) =
+    inr (app≠lam M₁ M₂ N)
+  Trm-is-decid (app M₁ M₂) (app N₁ N₂) =
+    [ inl ∘ (λ z → =ap₂ app (prj1 z) (prj2 z))
+    ∥ inr ∘ ¬fnt app-injₗ
+    ∥ inr ∘ ¬fnt app-injᵣ
+    ] aux
+    where MN1 : (M₁ == N₁) + ¬ (M₁ == N₁)
+          MN1 = Trm-is-decid M₁ N₁
+          MN2 : (M₂ == N₂) + ¬ (M₂ == N₂)
+          MN2 = Trm-is-decid M₂ N₂
+          MN : ((M₁ == N₁) × (M₂ == N₂)) + ((M₁ == N₁) × (¬ (M₂ == N₂)))
+                    + ((¬ (M₁ == N₁)) × (M₂ == N₂)) + ((¬ (M₁ == N₁)) × (¬ (M₂ == N₂)))
+          MN = +×+-dist (MN1 , MN2)
+          aux : ((M₁ == N₁) × (M₂ == N₂)) + ¬ (M₁ == N₁) + ¬ (M₂ == N₂)
+          aux = [ inl ∣ [ inr ∘ inr ∘ prj2 ∥ inr ∘ inl ∘ prj1 ∥ inr ∘ inl ∘ prj1 ] ] MN
+  
+  Trm-is-set : ∀ n → isSet (Trm n)
+  Trm-is-set n = HedbergThm (Trm-is-decid {n})
 
 
   -- context extension
@@ -401,18 +474,93 @@ module Lambda-Calculus where
     βappₗ : ∀ {M P N} → M ⟶ P → (app M N) ⟶ (app P N)
     βappᵣ : ∀ {M N P} → N ⟶ P → (app M N) ⟶ (app M P)
 
-  βlam-inv : ∀ {n} {M N : Trm (suc n)} → lam M ⟶ lam N → M ⟶ N
-  βlam-inv (βlam stp) = stp
-  βlam-uq :  ∀ {n} {M : Trm (suc n)} {N : Trm n} → lam M ⟶ N
-               → Σ[ Trm (suc n) ] (λ x → M ⟶ x × (N == lam x))
-  βlam-uq {n} {M} {lam N'} (βlam stp) = N' ,, (stp , =rf)
-  βlam-uqg :  ∀ {n} {M : Trm (suc n)} {P N : Trm n} → lam M == P → P ⟶ N
-               → Σ[ Trm (suc n) ] (λ x → M ⟶ x × (N == lam x))
-  βlam-uqg {n} {M} {lam M} {N} =rf = βlam-uq {M = M} {N}
+  βlam-inj : ∀ {n} {M N N' : Trm (suc n)}(stp : M ⟶ N)(stp' : M ⟶ N')
+               → (eq : lam N == lam N') → ((lam M ⟶_)● eq) (βlam stp) == βlam stp'
+                 → ((M ⟶_)● (lam-inj eq)) stp == stp'
+  βlam-inj stp stp =rf =rf = =rf
+  -- coh is needed: without it, induction on eq would not unify stp and stp'
 
+  βlam-inv-lam : ∀ {n} {M N : Trm (suc n)} → lam M ⟶ lam N → M ⟶ N
+  βlam-inv-lam (βlam stp) = stp
 
---  βappₗ-inv : ∀ {n} {M P N : Trm n} → (app M N) ⟶ (app P N) → M ⟶ P
---  βappₗ-inv stp = {!stp!}
+  βlam-inv : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+               → Σ[ Trm (suc n) ]
+                   (λ x → Σ[ M ⟶ x × (lam x == N) ]
+                            λ se → ((lam M ⟶_) ● prj2 se) (βlam (prj1 se)) == stp)
+  βlam-inv {n} {M} {lam N'} (βlam stp) = N' ,, ((stp , =rf) ,, =rf)
+  βlam-inv-trm : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+                   → Trm (suc n)
+  βlam-inv-trm stp = pj1 (βlam-inv stp)
+  βlam-inv-stp : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+                   → M ⟶ βlam-inv-trm stp
+  βlam-inv-stp stp = prj1 (pj1 (pj2 (βlam-inv stp)))
+  βlam-inv-eq : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+                   → lam (βlam-inv-trm stp) == N
+  βlam-inv-eq stp = prj2 (pj1 (pj2 (βlam-inv stp)))
+  βlam-inv-coh : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+                   → ((lam M ⟶_) ● βlam-inv-eq stp) (βlam (βlam-inv-stp stp)) == stp
+  βlam-inv-coh stp = pj2 (pj2 (βlam-inv stp))
+
+  βlam-inv-uq : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
+                  → {N' : Trm (suc n)} → (stp' : M ⟶ N') → (eq' : lam N' == N)
+                    → ((lam M ⟶_) ● eq') (βlam stp') == stp
+                      → Σ[ N' == βlam-inv-trm stp ]
+                          (λ x → ((M ⟶_) ● x) stp' == βlam-inv-stp stp)
+  βlam-inv-uq (βlam stp) {N'} stp' eq' coh' = lam-inj eq' ,, βlam-inj stp' stp eq' coh'
+
+  -- every reduction lam M ⟶ N comes via βlam from a reduction M ⟶ N' with lam N' == N
+  βlam-stp : ∀ {n} {M : Trm (suc n)} → Σ[ Trm (suc n) ] (M ⟶_) → Σ[ Trm n ] (lam M ⟶_)
+  βlam-stp {n} {M} = ⟨ lam ∘ pj1 ∣∣ (λ MM → βlam {n} (pj2 MM)) ⟩
+  βlam-stp-inv : ∀ {n} {M : Trm (suc n)} → Σ[ Trm n ] (lam M ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
+  βlam-stp-inv NN = βlam-inv-trm (pj2 NN) ,, βlam-inv-stp (pj2 NN)
+
+  βlam-stp-eq1 : ∀ {n} {M : Trm (suc n)} (NN : Σ[ Trm n ] (lam M ⟶_))
+                   → βlam-stp (βlam-stp-inv NN) == NN
+  βlam-stp-eq1 (N ,, stp) = =Σchar,, (βlam-inv-eq stp) (βlam-inv-coh stp)
+
+  βlam-stp-eq2 : ∀ {n} {M : Trm (suc n)} (NN : Σ[ Trm (suc n) ] (M ⟶_))
+                   → βlam-stp-inv (βlam-stp NN) == NN
+  βlam-stp-eq2 (N ,, stp) = =rf
+
+  βlam-eqv : ∀ {n} {M : Trm (suc n)} → is-equiv (βlam-stp {n} {M})
+  βlam-eqv {n} {M} (N ,, stp) =
+    -- element in `fib βlam-stp (N ,, stp)` with `stp : lam M ⟶ N`
+    ((βlam-inv-trm stp ,, βlam-inv-stp stp) ,, =Σchar (βlam-inv-eq stp) (βlam-inv-coh stp))
+    -- proof that every other element in the fibre is equal to the above one
+    ,, λ NN' → =Σchar,, (=Σchar,, (lam-inj (=pj1 (pj2 NN') • βlam-inv-eq stp ⁻¹))
+                                   {!(=pj2' (pj2 NN'))!})
+                         {!!}
+
+  applam-tric : ∀ {n M N P} (stp : app (lam {n} M) N ⟶ P)
+                    → Σ[ P == subst-0 M N ] (λ u → β M N == ((app (lam M) N ⟶_) ● u) stp)
+                         + Σ[ Σ[ Trm n ] (λ x → lam M ⟶ x × (P == app x N)) ]
+                            (λ z → βappₗ (prj1 (pj2 z)) == ((app (lam M) N ⟶_) ● (prj2 (pj2 z))) stp)
+                            + Σ[ Σ[ Trm n ] (λ x → N ⟶ x × (P == app (lam M) x)) ]
+                               (λ z → βappᵣ (prj1 (pj2 z)) == ((app (lam M) N ⟶_) ● (prj2 (pj2 z))) stp)
+  applam-tric (β M N)              = inl (=rf ,, =rf)
+  applam-tric (βappₗ stp)           = inr (inl ((_ ,, (stp , =rf)) ,, =rf))
+  applam-tric (βappᵣ stp)           = inr (inr ((_ ,, (stp , =rf)) ,, =rf))
+
+  ⟶-prop-aux : ∀ {n M N N'} → app {n} (lam M) N == subst-0 M N' → ¬ (N' ⟶ N)
+  ⟶-prop-aux {n} {M} {N} p stp = {!!}
+
+  applam-to-subst : ∀ {n M N P} → (p : P == subst-0 M N) → (stp : app (lam {n} M) N ⟶ P)
+                      → β M N == ((app (lam M) N ⟶_) ● p) stp
+  applam-to-subst {n} p stp = [ (λ z → pj2 z • ●irrelₚₜ (Trm-is-set n) (pj1 z) p stp)
+                              ∥ {!!} ∥ {!!} ] (applam-tric stp)
+
+  ⟶-is-prop : ∀ {n} {M N : Trm n} → isProp (M ⟶ N)
+  ⟶-is-prop {n} (β M N) stp2 = {!!}
+    where aux : ∀ {P} (stp : app (lam M) N ⟶ P) → (p : P == subst-0 M N)
+                      → β M N == ((app (lam M) N ⟶_) ● p) stp
+          aux (β M N) p = ●loop=idₚₜ (Trm-is-set n) p (β M N) ⁻¹
+          -- in the other two cases p should yield N₀
+          aux (βappₗ stp) p = {!stp!}
+          aux (βappᵣ stp) p = {!!}
+  ⟶-is-prop (βlam stp1) (βlam stp2) = =ap βlam (⟶-is-prop stp1 stp2)
+  ⟶-is-prop (βappₗ stp1) stp2 = {!!}
+  ⟶-is-prop (βappᵣ stp1) stp2 = {!!}
+
 
   -- reflexive and transitive closure of the one-step reduction relation
   _⟶⋆_ :  {n : Nat} → Trm n → Trm n → Set
@@ -493,12 +641,12 @@ module Lambda-Calculus where
   ⟶⋆-trmsect redN fz = redN
   ⟶⋆-trmsect redN (fs i) = ⟶⋆rfl (var i)
 
-  -- can use names given by Agda for variables in non-canonical arguments
-  -- of inductive definitions (everything within a dot...).
   ⟶⋆-rename : {n m : Nat}{M M' : Trm n}(f : Fin n → Fin m)
                  → M ⟶⋆ M' → rename M f ⟶⋆ rename M' f
   ⟶⋆-rename {M = M} {M} f (tcrfl M) =
     ⟶⋆rfl (rename M f)
+  ⟶⋆-rename {M = M} {N} f (tccnc red stp) = tccnc (⟶⋆-rename f red) (⟶-rename f stp)
+{-
   ⟶⋆-rename {M = M} {.(subst-all M₁ (trmsect N))} f (tccnc redM (β M₁ N)) =
     ⟶⋆cnc (⟶⋆-rename f redM)
            (=transp (λ x → app (lam (rename M₁ (liftFin f))) (rename N f) ⟶ x)
@@ -512,7 +660,7 @@ module Lambda-Calculus where
   ⟶⋆-rename {M = M} {app M' N'} f (tccnc redM (βappᵣ stpM)) =
     ⟶⋆cnc (⟶⋆-rename f redM)
            (βappᵣ (⟶-rename f stpM))
-
+-}
 
   ⟶⋆-ext : {n : Nat}{M M' : Trm n}
               → M ⟶⋆ M' → ext M ⟶⋆ ext M'
@@ -690,7 +838,7 @@ module Lambda-Calculus where
                                 → ≡>-Sink M' M'' → ≡>-Sink N' N''
                                   → ≡>-Sink (subst-0 M' N') (subst-0 M'' N'')
   ≡>-has-diamond-aux-red redMₗ redNₗ redMᵣ redNᵣ snkM snkN =
-    snk ,, (≡>-subst-0 (≡>⋄red₁ snkM) (≡>⋄red₁ snkN) , ≡>-subst-0 (≡>⋄red₂ snkM) (≡>⋄red₂ snkN))
+    snk ,, ( ≡>-subst-0 (≡>⋄red₁ snkM) (≡>⋄red₁ snkN) , ≡>-subst-0 (≡>⋄red₂ snkM) (≡>⋄red₂ snkN) )
     where snk : Trm _
           snk = subst-0 (≡>⋄trm snkM) (≡>⋄trm snkN)
 
@@ -771,6 +919,15 @@ module Lambda-Calculus where
   is-normal : ∀ {n} → Trm n → Set
   is-normal M = ∀ N → M ⟶ N → N₀
 
+  -- a term is either a variable, a lambda, or an application
+  Trm-EM : ∀ {n} → (M : Trm n) → Σ[ Fin n ] (λ x → var x == M)
+                                    + Σ[ Trm (suc n) ] (λ x → lam x == M)
+                                    + Σ[ Trm n × Trm n ] (λ x → app (prj1 x) (prj2 x) == M)
+  Trm-EM (var i)             = inl (i ,, =rf)
+  Trm-EM (lam M)             = inr (inl (M ,, =rf))
+  Trm-EM (app M₁ M₂)         = inr (inr ((M₁ , M₂) ,, =rf))
+
+  -- a value is a canonical normal term
   data is-value {n : Nat} : Trm n → Set where
     val-lam : ∀ {M} → is-normal M → is-value (lam M)
 
@@ -784,6 +941,7 @@ module Lambda-Calculus where
   nrm-appᵣ : ∀ {n M N} → is-normal {n} (app M N) → is-normal N
   nrm-appᵣ nrm = λ N stp → nrm (app _ N) (βappᵣ stp)
 
+  -- a term is strongly normalising if all its sequences of reductions terminate
   data isStrNrmₗₑᵥ {n : Nat} : Nat → Trm n → Set where
     strnrm-nrm : ∀ {M} → is-normal M → isStrNrmₗₑᵥ zero M
     strnrm-stp : ∀ {k M} → (∀ {N} → M ⟶ N → isStrNrmₗₑᵥ k N) → isStrNrmₗₑᵥ (suc k) M
@@ -803,6 +961,165 @@ module Lambda-Calculus where
   strnrm-⟶ : ∀ {n M N} → isStrNrm {n} M → M ⟶ N → isStrNrm N
   strnrm-⟶ {n} snM = strnrm-⟶ₗₑᵥ (pj2 snM)
 
+  -- number of one step β-reductions from a term
+  ⟶# : ∀ {n} → Trm n → Nat
+  ⟶# (var i) = zero
+  ⟶# (lam M) = ⟶# M
+  ⟶# (app (var i) M₂) = ⟶# M₂
+  ⟶# (app (lam M₁) M₂) = suc (⟶# M₁ +N ⟶# M₂)
+  ⟶# (app (app M₁ N₁) M₂) = ⟶# (app M₁ N₁) +N ⟶# M₂
+    
+  ⟶#-lam= : ∀ {n} {P : Trm (suc n)} {M : Trm n} → lam P == M → ⟶# P == ⟶# M
+  ⟶#-lam= {n} {P} {M} eq = =transp (λ x → ⟶# P == ⟶# x) eq =rf 
+
+  -- enumeration of one-step reductions of a term
+  ⟶enm : ∀ {n} M → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
+  ⟶enm {n} (lam M) i =
+    lam (pj1 (ih i)) ,, βlam (pj2 (ih i))
+    where ih : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
+          ih = ⟶enm M
+  ⟶enm {n} (app M₁ M₂) = +rec3 (λ z → fv (pj2 z))
+                                 (λ z → fl (pj2 z))
+                                 (λ z → fa (pj2 z))
+                                 M₁EM
+    -- Agda complains if we try induction on M₁, so try propositionally instead.
+    where M₁EM : Σ[ Fin n ] (λ x → var x == M₁) + Σ[ Trm (suc n) ] (λ x → lam x == M₁)
+                    + Σ[ Trm n × Trm n ] (λ x → app (prj1 x) (prj2 x) == M₁)
+          M₁EM = Trm-EM M₁
+          enmM₁ : Fin (⟶# M₁) → Σ[ Trm n ] (M₁ ⟶_)
+          enmM₁ = ⟶enm M₁
+          enmM₂ : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
+          enmM₂ = ⟶enm M₂
+          -- if var i == M₁, only the reductions of M₂ matter
+          enmM₂v : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (M₂ ⟶_)
+          enmM₂v eq j = enmM₂ (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
+          fv : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
+          fv eq j = app M₁ (pj1 (enmM₂v eq j)) ,, βappᵣ (pj2 (enmM₂v eq j))
+          -- if lam M == M₁, we have to count β in addition to the reductions of M and M₂
+          -- reductions M ⟶_ are in bijections with reductions M₁ ⟶
+          bjlF : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Fin (⟶# M₁)
+          bjlF = =transp (λ x → Fin (⟶# x))
+          bjlT : ∀ {M} → lam M == M₁ → Σ[ Trm n ] (M₁ ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
+          bjlT {M} eq (N ,, stp) = βlam-inv-trm (((_⟶ N) ● eq ⁻¹) stp)
+                                   ,, βlam-inv-stp (((_⟶ N) ● eq ⁻¹) stp)
+          -- so we can enumerate the reductions of M without using ⟶enm
+          enmM₁l : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
+          enmM₁l eq = bjlT eq ∘ enmM₁ ∘ bjlF eq
+          -- the reductions are β, those of M and those of M₂
+          enm-al : ∀ {M} → lam M == M₁ → Fin (suc (⟶# M +N ⟶# M₂)) → Σ[ Trm n ] ((app M₁ M₂ ⟶_))
+          enm-al {M} eq fz =
+            subst-0 M M₂ ,, =transp (λ x → app x M₂ ⟶ subst-0 M M₂) eq (β M M₂)
+          enm-al {M} eq (fs j) =
+            Fin+N-fnc (λ x → app (lam (pj1 (enmM₁l eq x))) M₂
+                             ,, βappₗ (((_⟶ lam (pj1 (enmM₁l eq x)))● eq)
+                                                           (βlam (pj2 (enmM₁l eq x)))))
+                      (λ x → app M₁ (pj1 (enmM₂ x))
+                             ,, βappᵣ (pj2 (enmM₂ x)))
+                      j
+          fl : ∀ {M} → lam M == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
+          fl eq j = enm-al eq (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
+          -- if app M N == M₁, only the reductions of M₁ and M₂ matter
+          bjaF : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M N)) → Fin (⟶# M₁)
+          bjaF = =transp (λ x → Fin (⟶# x))
+          bjaFa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app (app M N) M₂)) → Fin (⟶# (app M₁ M₂))
+          bjaFa = =transp (λ x → Fin (⟶# (app x M₂)))
+          bjaFa⁻¹ : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Fin (⟶# (app (app M N) M₂))
+          bjaFa⁻¹ eq = =transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹)
+          fa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
+          fa {M} {N} eq = Fin+N-fnc (f₁ ∘ bjaF eq) f₂ ∘ bjaFa⁻¹ eq
+            where f₁ : Fin (⟶# M₁) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
+                  f₁ j = app (pj1 (enmM₁ j)) M₂ ,, βappₗ (pj2 (enmM₁ j))
+                  f₂ : Fin (⟶# M₂) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
+                  f₂ j = app M₁ (pj1 (enmM₂ j)) ,, βappᵣ (pj2 (enmM₂ j))
+
+
+  -- exact enumeration of one-step reductions of a term
+  ⟶enmex : ∀ {n} M → Σ[ (Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)) ] is-equiv
+
+  ⟶enmex {n} (var i) = {!!} ,, {!!}
+
+  ⟶enmex {n} (lam M) =
+    lenm --⟨ lam ∘ pj1 ∘ ihf ∣∣ (λ i → βlam {n} (pj2 (ihf i))) ⟩
+    ,, {!!}
+    where ihf : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
+          ihf = pj1 (⟶enmex M)
+          iheqv : is-equiv ihf
+          iheqv = pj2 (⟶enmex M)
+          lamstp : Σ[ Trm (suc n) ] (M ⟶_) → Σ[ Trm n ] (lam M ⟶_)
+          lamstp = ⟨ lam ∘ pj1 ∣∣ (λ MM → βlam {n} (pj2 MM)) ⟩
+          lemstpeqv : is-equiv lamstp
+          lemstpeqv (N ,, stp) = ((βlam-inv-trm stp ,, βlam-inv-stp stp)
+                                  ,, =Σchar (βlam-inv-eq stp) (βlam-inv-coh stp))
+                                 ,, {!λ ((P ,, stp') ,, eqP) → ?!}
+          --ihr : ∀ i → M ⟶ (ihf i)
+          --ihr i = pj2 (pj1 (⟶enmex M) i)
+          lenm : Fin (⟶# (lam M)) → Σ[ Trm n ] (lam M ⟶_)
+          lenm = lamstp ∘ ihf
+          --lam (pj1 (ihf i)) ,, βlam (pj2 (ihf i))
+          leqv : is-equiv lenm
+          leqv (N ,, stp) = {!⟨_∣∣_⟩!}
+            where NN : Σ[ Trm (suc n) ] --(λ x → M ⟶ x  × (N == lam x))
+                        (λ x → Σ[ M ⟶ x × (lam x == N) ]
+                            λ se → ((lam M ⟶_) ● prj2 se) (βlam (prj1 se)) == stp)
+                  NN = βlam-inv stp
+                  N' : Trm (suc n)
+                  N' = pj1 (βlam-inv stp)
+                  stp' : M ⟶ N'
+                  stp' = βlam-inv-stp stp --prj1 (pj2 (βlam-inv stp))
+                  eq : lam N' == N
+                  eq = βlam-inv-eq stp --prj2 (pj2 (βlam-inv stp))
+                  idx' : Σ[ Fin (⟶# M) ] (λ x → ihf x == N' ,, stp')
+                  idx' = pj1 (iheqv (N' ,, stp'))
+                  idxuq' : (xx' : fib ihf (N' ,, stp')) → xx' == idx'
+                  idxuq' = pj2 (iheqv (N' ,, stp'))
+                  idx-aux : lenm (pj1 idx') == lam N' ,, βlam stp'
+                  idx-aux = =Σchar,, (=ap lam (=ap pj1 (pj2 idx')))
+                                     (=proof
+                    ((lam M ⟶_) ● =ap lam (=ap (λ z → pj1 z) (pj2 idx'))) (βlam (pj2 (ihf (pj1 idx'))))
+                       ==[ {!!} ] /
+                    ((λ x → lam M ⟶ lam (pj1 x)) ● (pj2 idx')) (βlam (pj2 (ihf (pj1 idx'))))
+                       ==[ {!!} ] /
+                    βlam (((λ x → M ⟶ pj1 x) ● (pj2 idx')) (pj2 (ihf (pj1 idx'))))
+                       ==[ {!!} ]∎
+                    βlam stp' ∎)
+                  idx : fib lenm (N ,, stp)
+                  idx = pj1 idx' ,, {!!}
+
+  ⟶enmex {n} (app M₁ M₂) = {!!}
+
+
+  ⟶enm-inv : ∀ {n} M → (NN : Σ[ Trm n ] (M ⟶_)) → fib (⟶enm M) NN
+  ⟶enm-inv (var i) NN = {!!}
+  ⟶enm-inv (lam M) NN = {!!}
+  ⟶enm-inv (app M₁ M₂) NN = {!!}
+
+
+  strnrm-bound : ∀ {n} {M : Trm n} → (nn : ∀ {N} → M ⟶ N → isStrNrm {n} N)
+                 → Σ[ Nat ] (λ x → ∀ {N} → M ⟶ N → isStrNrmₗₑᵥ {n} x N)
+                 --nn {N} stp ≤N nn (pj2 x)
+  strnrm-bound {n} {M} nn = mx ,, {!!}
+    where nnFN : Fin (⟶# M) → Nat
+          nnFN i = pj1 (nn {pj1 (⟶enm M i)} (pj2 (⟶enm M i)))
+          mxnn : (Fin (⟶# M) → N₀) + Σ[ Fin (⟶# M) ] (is-max≤N-Fin-ext nnFN)
+          mxnn = max≤N-Fin-ext nnFN
+          mx : Nat
+          mx = [ (λ _ → zero)        -- zero if there are no reductions from M
+               ∣ (λ z → nnFN (pj1 z)) -- the max of nnFN otherwise
+               ] mxnn
+          mxismx : ∀ {N} stp → (pj1 (nn {N} stp)) ≤N mx
+          mxismx stp = [ (λ h → N₀ind (h {!!})) ∣ {!!} ] mxnn
+              
+
+
+  strnrm-any-stp : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm {n} N)
+                     → ∀ {N} → M ⟶ N → isStrNrm M
+  strnrm-any-stp {n} snstp stp =
+    suc (pj1 (snstp stp)) ,, strnrm-stp {!!}
+    -- strnrm-stp (λ stp' → {!pj2 (snstp stp)!})
+    where aux :  ∀ M → (∀ {N} → M ⟶ N → isStrNrm {n} N) → Nat
+          aux = {!!}
+
+{-
   -- need to take the max of a finite set
   strnrm-⟶-inv : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm N) → isStrNrm {n} M
   strnrm-⟶-inv pf = {!!}
@@ -823,7 +1140,7 @@ module Lambda-Calculus where
           enm-eqv : is-equiv enm
           enm-eqv = pj2 (pj2 ih)
           lftN : (z : Σ[ Trm n ] (lam M ⟶_)) → Σ[ Trm (suc n) ] (λ x → M ⟶ x × (pj1 z == lam x))
-          lftN z = βlam-uq (pj2 z)
+          lftN z = βlam-inv (pj2 z)
           cntr : (z : Σ[ Trm n ] (lam M ⟶_))
                     → isContr (fib enm (pj1 (lftN z) ,, prj1 (pj2 (lftN z))))
           cntr z = enm-eqv (pj1 (lftN z) ,, prj1 (pj2 (lftN z)))
@@ -864,165 +1181,6 @@ module Lambda-Calculus where
           snd : (i : Fin (suc (suc l))) → isStrNrmₗₑᵥ (pj1 mx) (pj1 (NN i))
           snd fz = strnrm-upw (pj2 (pj2 NNz)) (prj1 (pj2 mx))
           snd (fs i) = strnrm-upw (pj2 ih i) (prj1 (prj2 (pj2 mx)))          
-
-  -- number of one step β-reductions from a term
-  ⟶# : ∀ {n} → Trm n → Nat
-  ⟶# (var i) = zero
-  ⟶# (lam M) = ⟶# M
-  ⟶# (app (var i) M₂) = ⟶# M₂
-  ⟶# (app (lam M₁) M₂) = suc (⟶# M₁ +N ⟶# M₂)
-  ⟶# (app (app M₁ N₁) M₂) = ⟶# (app M₁ N₁) +N ⟶# M₂
-
-  ⟶#-lam= : ∀ {n} {P : Trm (suc n)} {M : Trm n} → lam P == M → ⟶# P == ⟶# M
-  ⟶#-lam= {n} {P} {M} eq = =transp (λ x → ⟶# P == ⟶# x) eq =rf 
-
-  Trm-EM : ∀ {n} → (M : Trm n) → Σ[ Fin n ] (λ x → var x == M)
-                                    + Σ[ Trm (suc n) ] (λ x → lam x == M)
-                                    + Σ[ Trm n × Trm n ] (λ x → app (prj1 x) (prj2 x) == M)
-  Trm-EM (var i)             = inl (i ,, =rf)
-  Trm-EM (lam M)             = inr (inl (M ,, =rf))
-  Trm-EM (app M₁ M₂)         = inr (inr ((M₁ , M₂) ,, =rf))
-
-
-  -- enumeration of one-step reductions of a term
-  ⟶enm : ∀ {n M} → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
-
-  ⟶enm {n} {lam M} i =
-    lam (pj1 (ih i)) ,, βlam (pj2 (ih i))
-    where ih : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
-          ih = ⟶enm {M = M}
-  ⟶enm {n} {app M₁ M₂} = +rec3 (λ z → fv (pj2 z))
-                                 (λ z → fl (pj2 z))
-                                 (λ z → fa (pj2 z))
-                                 M₁EM
-    -- Agda complains if we try induction on M₁, so need to take a different route.
-    where M₁EM : Σ[ Fin n ] (λ x → var x == M₁) + Σ[ Trm (suc n) ] (λ x → lam x == M₁)
-                    + Σ[ Trm n × Trm n ] (λ x → app (prj1 x) (prj2 x) == M₁)
-          M₁EM = Trm-EM M₁
-          enmM₁ : Fin (⟶# M₁) → Σ[ Trm n ] (M₁ ⟶_)
-          enmM₁ = ⟶enm {M = M₁}
-          enmM₂ : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
-          enmM₂ = ⟶enm {M = M₂}
-          -- if var i == M₁, only the reductions of M₂ matter
-          enmM₂v : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (M₂ ⟶_)
-          enmM₂v eq j = enmM₂ (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
-          fv : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fv eq j = app M₁ (pj1 (enmM₂v eq j)) ,, βappᵣ (pj2 (enmM₂v eq j))
-          -- if lam M == M₁, we have to count β in addition to the reductions of M and M₂
-          -- reductions M ⟶_ are in bijections with reductions M₁ ⟶
-          bjlF : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Fin (⟶# M₁)
-          bjlF = =transp (λ x → Fin (⟶# x))
-          bjlT : ∀ {M} → lam M == M₁ → Σ[ Trm n ] (M₁ ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
-          bjlT {M} eq NN = pj1 aux ,, prj1 (pj2 aux)
-            where aux : Σ[ Trm (suc n) ] (λ x → M ⟶ x × (pj1 NN == lam x))
-                  aux = βlam-uqg eq (pj2 NN)
-          -- so we can enumerate the reductions of M without using ⟶enm
-          enmM₁l : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
-          enmM₁l eq = bjlT eq ∘ enmM₁ ∘ bjlF eq
-          -- the reductions are β, those of M and those of M₂
-          enm-al : ∀ {M} → lam M == M₁ → Fin (suc (⟶# M +N ⟶# M₂)) → Σ[ Trm n ] ((app M₁ M₂ ⟶_))
-          enm-al {M} eq fz =
-            subst-0 M M₂ ,, =transp (λ x → app x M₂ ⟶ subst-0 M M₂) eq (β M M₂)
-          enm-al {M} eq (fs j) =
-            Fin+N-fnc (λ x → app (lam (pj1 (enmM₁l eq x))) M₂
-                             ,, βappₗ (((_⟶ lam (pj1 (enmM₁l eq x)))● eq)
-                                                           (βlam (pj2 (enmM₁l eq x)))))
-                      (λ x → app M₁ (pj1 (enmM₂ x))
-                             ,, βappᵣ (pj2 (enmM₂ x)))
-                      j
-          fl : ∀ {M} → lam M == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fl eq j = enm-al eq (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
-          -- if app M N == M₁, only the reductions of M₁ and M₂ matter
-          bjaF : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M N)) → Fin (⟶# M₁)
-          bjaF = =transp (λ x → Fin (⟶# x))
-          bjaFa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app (app M N) M₂)) → Fin (⟶# (app M₁ M₂))
-          bjaFa = =transp (λ x → Fin (⟶# (app x M₂)))
-          bjaFa⁻¹ : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Fin (⟶# (app (app M N) M₂))
-          bjaFa⁻¹ eq = =transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹)
-          fa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fa {M} {N} eq = Fin+N-fnc (f₁ ∘ bjaF eq) f₂ ∘ bjaFa⁻¹ eq
-            where f₁ : Fin (⟶# M₁) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-                  f₁ j = app (pj1 (enmM₁ j)) M₂ ,, βappₗ (pj2 (enmM₁ j))
-                  f₂ : Fin (⟶# M₂) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-                  f₂ j = app M₁ (pj1 (enmM₂ j)) ,, βappᵣ (pj2 (enmM₂ j))
-
-{-
-  -- Agda complains that the definition does not terminate if I try induction on M₁
-
-  ⟶enm {n} {app (var j) M₂} i =
-    app (var j) (pj1 (ih i)) ,, βappᵣ (pj2 (ih i))
-    where ih : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
-          ih = ⟶enm {M = M₂}
-
-  ⟶enm {n} {app (lam M₁) M₂} fz =
-    subst-0 M₁ M₂ ,, β M₁ M₂
-
-  ⟶enm {n} {app (lam M₁) M₂} (fs i) =
-    Fin+N-fnc f₁ f₂ i
-    ,, Fin+N-ind (λ x → app (lam M₁) M₂ ⟶ Fin+N-fnc f₁ f₂ x)
-                 (λ j → =transp (app (lam M₁) M₂ ⟶_)
-                                 (Fin+N-trl f₁ f₂ j ⁻¹)
-                                 (βappₗ (βlam (pj2 (ih₁ j)))) )
-                 (λ j → =transp (app (lam M₁) M₂ ⟶_)
-                                 (Fin+N-trr f₁ f₂ j ⁻¹)
-                                 (βappᵣ (pj2 (ih₂ j))) )
-                 i
-    where ih₁ : Fin (⟶# M₁) → Σ[ Trm (suc n) ] (M₁ ⟶_)
-          ih₁ = ⟶enm {M = M₁}
-          ih₂ : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
-          ih₂ = ⟶enm {M = M₂}
-          f₁ : Fin (⟶# M₁) → Trm n
-          f₁ j = app (lam (pj1 (ih₁ j))) M₂
-          f₂ : Fin (⟶# M₂) → Trm n
-          f₂ j = app (lam M₁) (pj1 (ih₂ j))
-
-  ⟶enm {n} {app (app M₁ N₁) M₂} i =
-    Fin+N-fnc f₁ f₂ i
-    ,, Fin+N-ind (λ x → app (app M₁ N₁) M₂ ⟶ Fin+N-fnc f₁ f₂ x)
-                 (λ j → =transp (app (app M₁ N₁) M₂ ⟶_)
-                                 (Fin+N-trl f₁ f₂ j ⁻¹)
-                                 (βappₗ {!!}) ) -- (βappₗ (pj2 (ih₁ j)))
-                 (λ j → =transp (app (app M₁ N₁) M₂ ⟶_)
-                                 (Fin+N-trr f₁ f₂ j ⁻¹)
-                                 (βappᵣ {M = app M₁ N₁} (pj2 (ih₂ j))) )
-                 i
-    where --ih₁ : Fin (⟶# (app M₁ N₁)) → Σ[ Trm n ] (app M₁ N₁ ⟶_)
-          --ih₁ = ⟶enm {M = app M₁ N₁}
-          ih₁₁ : Fin (⟶# M₁) → Σ[ Trm n ] (M₁ ⟶_)
-          ih₁₁ = ⟶enm {M = M₁}
-          ih₁₂ : Fin (⟶# N₁) → Σ[ Trm n ] (N₁ ⟶_)
-          ih₁₂ = ⟶enm {M = N₁}
-          ih₂ : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
-          ih₂ = ⟶enm {M = M₂}
-          f₁ : Fin (⟶# (app M₁ N₁)) → Trm n
-          f₁ j = {!!}
-          --app (app (pj1 (ih₁₁ j)) (pj1 (ih₁₂ j))) M₂
-          f₂ : Fin (⟶# M₂) → Trm n
-          f₂ j = app (app M₁ N₁) (pj1 (ih₂ j))
 -}
 
-  ⟶-fambound :  ∀ {n} {M : Trm n} → (nn : ∀ {N} → M ⟶ N → Nat)
-                      → Σ[ Nat ] (λ x → ∀ {N} stp → nn {N} stp ≤N x)
-  ⟶-fambound {n} {var i} nn = {!!}
-  ⟶-fambound {n} {lam M} nn = {!!}
-  ⟶-fambound {n} {app (var i) M₂} nn = {!!}
-  ⟶-fambound {n} {app (lam M₁) M₂} nn = {!⟶-fambound!}
-  ⟶-fambound {n} {app (app M₁ N₁) M₂} nn = {!!}
-
-  strnrm-bound : ∀ {n} {M : Trm n} → (nn : ∀ {N} → M ⟶ N → isStrNrm {n} N)
-                 → Σ[ Nat ] (λ x → ∀ {N} → M ⟶ N → isStrNrmₗₑᵥ {n} x N)
-                 --nn {N} stp ≤N nn (pj2 x)
-  strnrm-bound nn = {!sum-succNat!}
-    
-
-
-  strnrm-any-stp : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm {n} N)
-                     → ∀ {N} → M ⟶ N → isStrNrm M
-  strnrm-any-stp {n} snstp stp =
-    suc (pj1 (snstp stp)) ,, strnrm-stp {!!}
-    -- strnrm-stp (λ stp' → {!pj2 (snstp stp)!})
-    where aux :  ∀ M → (∀ {N} → M ⟶ N → isStrNrm {n} N) → Nat
-          aux = {!!}
-
-
--- end file
+-- end of file

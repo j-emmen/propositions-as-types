@@ -110,7 +110,10 @@ module simpleTT (A : Set) where
   -- projections forget variables
   π-≤ : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → len Γ' ≤N len Γ
   π-≤ π-∅                              = 0₁
-  π-≤  {Γ'} {R ∣ Γ} (π-frg R eq πp)     = suc-≤ (len Γ') (len Γ) (π-≤ πp)
+  π-≤  {Γ'} {R ∣ Γ} (π-frg R eq πp)     = suc-≤ {len Γ'} {len Γ} (π-≤ πp)
+  -- the expression
+  -- suc-≤ (len Γ') (len Γ) (π-≤ πp)
+  -- would compile. Why?
   π-≤ (π-cnc R eqz eqs πp)             = π-≤ πp
   π-≤ (π-swp R S eqz eqsz eqss πp)     = π-≤ πp
 
@@ -445,30 +448,47 @@ module simpleTT (A : Set) where
     rc-⇒ : ∀ {T S} → (∀ {N} → red-can {n} N T → red-cand (app M N) S) → red-cand M (T ⇒ S)
 -}
 
+
+  red-cand-ind : ∀ {n} → (M : Trm n) → (T : Ty) → Set
+  red-cand-ind {zero} = red-cand-aux₀
+    where data red-cand-aux₀ : ∀ (M : Trm zero) → (T : Ty) → Set where
+            rc-atm₀ : ∀ {M} {a} → isStrNrm M → red-cand-aux₀ M (atm a)
+  red-cand-ind {suc n} = red-cand-auxₛ
+    where data red-cand-auxₛ : (M : Trm (suc n)) → (T : Ty) → Set where
+            rc-atm : ∀ {M} {a} → isStrNrm {suc n} M → red-cand-auxₛ M (atm a)
+            rc-⇒ : ∀ {M : Trm (suc n)} {T} {S}
+                      → (∀ {N} → red-cand-ind {n} N T → red-cand-ind {n} (subst-0 M N) S)
+                        → red-cand-auxₛ M (T ⇒ S)
+  
+
+
+{-
   data red-cand {n} (M : Trm n) : (T : Ty) → Set where
     rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
-    -- not the right definition: there should be red-cand {n} N T instead of the typing judgement
-    rc-⇒ : ∀ {T S} → (∀ {N} → (f : Fin n → Ty)
-             → pj1 (fnc2Ctx f) ⊢ =transp Trm (pj2 (fnc2Ctx f)) N ∶ T → red-cand (app M N) S)
+    rc-⇒ : ∀ {T S} → (∀ {N} -- → (f : Fin n → Ty)
+             → red-cand {n} N T --pj1 (fnc2Ctx f) ⊢ =transp Trm (pj2 (fnc2Ctx f)) N ∶ T
+             → red-cand (app M N) S)
                 → red-cand M (T ⇒ S)
+    -- not the right definition:
+    -- there should be red-cand {n} N T instead of the typing judgemen
+-}
 
-  data is-neutral {n} : Trm n → Set where
-    neu-var : ∀ {i} → is-neutral (var i)
-    neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
+--   data is-neutral {n} : Trm n → Set where
+--     neu-var : ∀ {i} → is-neutral (var i)
+--     neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
 
-  red-cand-Props : Ty → ∀ {n} → Trm n → Set
-  red-cand-Props T M = (red-cand M T → isStrNrm M)
-                       × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T)
-                       × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
+--   red-cand-Props : Ty → ∀ {n} → Trm n → Set
+--   red-cand-Props T M = (red-cand M T → isStrNrm M)
+--                        × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T) -- trivial from above?
+--                        × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
 
-  red-cand-props : ∀ T {n} M → red-cand-Props T {n} M
-  red-cand-props (atm a) M =
-    rc-atm-inv
-    , (λ rc stp → rc-atm (strnrm-⟶ (rc-atm-inv rc) stp))
-    , {!!}
-    where rc-atm-inv : red-cand M (atm a) → isStrNrm M
-          rc-atm-inv (rc-atm nrm) = nrm
-
-  red-cand-props (T ⇒ S) M = {!!}
+--   red-cand-props : ∀ T {n} M → red-cand-Props T {n} M
+--   red-cand-props (atm a) M =
+--     rc-atm-inv
+--     , (λ rc stp → rc-atm (strnrm-⟶ (rc-atm-inv rc) stp))
+--     , {!!}
+--     where rc-atm-inv : red-cand M (atm a) → isStrNrm M
+--           rc-atm-inv (rc-atm nrm) = nrm
+--   red-cand-props (T ⇒ S) M = {!!}
   
--- end file
+-- -- end file
