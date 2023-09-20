@@ -1,7 +1,7 @@
 {-# OPTIONS --allow-unsolved-metas #-}
 
 module Lambda-Calculus where
-  open import Basic-Inductives
+  open import Nat-and-Fin
 
 
   -- canonical lift of a function between finite sets
@@ -99,8 +99,8 @@ module Lambda-Calculus where
     inr (app≠lam M₁ M₂ N)
   Trm-is-decid (app M₁ M₂) (app N₁ N₂) =
     [ inl ∘ (λ z → =ap₂ app (prj1 z) (prj2 z))
-    ∥ inr ∘ ¬fnt app-injₗ
-    ∥ inr ∘ ¬fnt app-injᵣ
+    ∥ inr ∘ ¬-is-covar app-injₗ
+    ∥ inr ∘ ¬-is-covar app-injᵣ
     ] aux
     where MN1 : (M₁ == N₁) + ¬ (M₁ == N₁)
           MN1 = Trm-is-decid M₁ N₁
@@ -474,19 +474,21 @@ module Lambda-Calculus where
     βappₗ : ∀ {M P N} → M ⟶ P → (app M N) ⟶ (app P N)
     βappᵣ : ∀ {M N P} → N ⟶ P → (app M N) ⟶ (app M P)
 
+
+  -- Inverting βlam
+  
   βlam-inj : ∀ {n} {M N N' : Trm (suc n)}(stp : M ⟶ N)(stp' : M ⟶ N')
                → (eq : lam N == lam N') → ((lam M ⟶_)● eq) (βlam stp) == βlam stp'
                  → ((M ⟶_)● (lam-inj eq)) stp == stp'
   βlam-inj stp stp =rf =rf = =rf
-  -- coh is needed: without it, induction on eq would not unify stp and stp'
-
-  βlam-inv-lam : ∀ {n} {M N : Trm (suc n)} → lam M ⟶ lam N → M ⟶ N
-  βlam-inv-lam (βlam stp) = stp
+  -- The second equation (not eq) is needed:
+  -- without it, induction on eq would not unify stp and stp'.
+  -- The same equation is needed below to invert βlam.
 
   βlam-inv : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
                → Σ[ Trm (suc n) ]
                    (λ x → Σ[ M ⟶ x × (lam x == N) ]
-                            λ se → ((lam M ⟶_) ● prj2 se) (βlam (prj1 se)) == stp)
+                            λ z → ((lam M ⟶_) ● prj2 z) (βlam (prj1 z)) == stp)
   βlam-inv {n} {M} {lam N'} (βlam stp) = N' ,, ((stp , =rf) ,, =rf)
   βlam-inv-trm : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
                    → Trm (suc n)
@@ -508,47 +510,229 @@ module Lambda-Calculus where
                           (λ x → ((M ⟶_) ● x) stp' == βlam-inv-stp stp)
   βlam-inv-uq (βlam stp) {N'} stp' eq' coh' = lam-inj eq' ,, βlam-inj stp' stp eq' coh'
 
-  -- every reduction lam M ⟶ N comes via βlam from a reduction M ⟶ N' with lam N' == N
-  βlam-stp : ∀ {n} {M : Trm (suc n)} → Σ[ Trm (suc n) ] (M ⟶_) → Σ[ Trm n ] (lam M ⟶_)
+  βlam-stp : ∀ {n} {M : Trm (suc n)}
+                      → Σ[ Trm (suc n) ] (M ⟶_) → Σ[ Trm n ] (lam M ⟶_)
   βlam-stp {n} {M} = ⟨ lam ∘ pj1 ∣∣ (λ MM → βlam {n} (pj2 MM)) ⟩
-  βlam-stp-inv : ∀ {n} {M : Trm (suc n)} → Σ[ Trm n ] (lam M ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
+  βlam-stp-inv : ∀ {n} {M : Trm (suc n)}
+                          → Σ[ Trm n ] (lam M ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
   βlam-stp-inv NN = βlam-inv-trm (pj2 NN) ,, βlam-inv-stp (pj2 NN)
 
-  βlam-stp-eq1 : ∀ {n} {M : Trm (suc n)} (NN : Σ[ Trm n ] (lam M ⟶_))
-                   → βlam-stp (βlam-stp-inv NN) == NN
-  βlam-stp-eq1 (N ,, stp) = =Σchar,, (βlam-inv-eq stp) (βlam-inv-coh stp)
-
-  βlam-stp-eq2 : ∀ {n} {M : Trm (suc n)} (NN : Σ[ Trm (suc n) ] (M ⟶_))
-                   → βlam-stp-inv (βlam-stp NN) == NN
-  βlam-stp-eq2 (N ,, stp) = =rf
+  βlam-iso : ∀ {n} {M : Trm (suc n)}
+                      → is-iso-pair (βlam-stp {n} {M}) (βlam-stp-inv {n} {M})
+  βlam-iso {n} {M} = eq1 , eq2
+    where eq1 : (NN : Σ[ Trm (suc n) ] (M ⟶_)) → βlam-stp-inv (βlam-stp NN) == NN
+          eq1 = Ση
+          eq2 : (NN : Σ[ Trm n ] (lam M ⟶_)) → βlam-stp (βlam-stp-inv NN) == NN
+          eq2 NN = =Σchar (βlam-inv-eq (pj2 NN)) (βlam-inv-coh (pj2 NN))
 
   βlam-eqv : ∀ {n} {M : Trm (suc n)} → is-equiv (βlam-stp {n} {M})
-  βlam-eqv {n} {M} (N ,, stp) =
-    -- element in `fib βlam-stp (N ,, stp)` with `stp : lam M ⟶ N`
-    ((βlam-inv-trm stp ,, βlam-inv-stp stp) ,, =Σchar (βlam-inv-eq stp) (βlam-inv-coh stp))
-    -- proof that every other element in the fibre is equal to the above one
-    ,, λ NN' → =Σchar,, (=Σchar,, (lam-inj (=pj1 (pj2 NN') • βlam-inv-eq stp ⁻¹))
-                                   {!(=pj2' (pj2 NN'))!})
-                         {!!}
+  βlam-eqv {n} {M} = invrt-is-eqv (βlam-stp-inv ,, βlam-iso {n} {M})
 
-  applam-tric : ∀ {n M N P} (stp : app (lam {n} M) N ⟶ P)
-                    → Σ[ P == subst-0 M N ] (λ u → β M N == ((app (lam M) N ⟶_) ● u) stp)
-                         + Σ[ Σ[ Trm n ] (λ x → lam M ⟶ x × (P == app x N)) ]
-                            (λ z → βappₗ (prj1 (pj2 z)) == ((app (lam M) N ⟶_) ● (prj2 (pj2 z))) stp)
-                            + Σ[ Σ[ Trm n ] (λ x → N ⟶ x × (P == app (lam M) x)) ]
-                               (λ z → βappᵣ (prj1 (pj2 z)) == ((app (lam M) N ⟶_) ● (prj2 (pj2 z))) stp)
-  applam-tric (β M N)              = inl (=rf ,, =rf)
-  applam-tric (βappₗ stp)           = inr (inl ((_ ,, (stp , =rf)) ,, =rf))
-  applam-tric (βappᵣ stp)           = inr (inr ((_ ,, (stp , =rf)) ,, =rf))
+  -- Inverting βappᵣ when first term is var
 
+  βappᵣvar-inv : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
+                 → Σ[ Trm n ]
+                     ( λ x → Σ[ M ⟶ x × (app (var i) x == N) ]
+                       (λ z → ((app (var i) M ⟶_) ● prj2 z) (βappᵣ (prj1 z)) == stp))
+  βappᵣvar-inv {n} {i} {M} {.(app (var i) _)} (βappᵣ stp) = _ ,, ((stp , =rf) ,, =rf)
+  βappᵣvar-inv-trm : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
+                       → Trm n
+  βappᵣvar-inv-trm stp = pj1 (βappᵣvar-inv stp)
+  βappᵣvar-inv-stp : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
+                 → M ⟶ βappᵣvar-inv-trm stp
+  βappᵣvar-inv-stp stp = prj1 (pj1 (pj2 (βappᵣvar-inv stp)))
+  βappᵣvar-inv-eq : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
+                    → app (var i) (βappᵣvar-inv-trm stp) == N
+  βappᵣvar-inv-eq stp = prj2 (pj1 (pj2 (βappᵣvar-inv stp)))
+  βappᵣvar-inv-coh : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
+    → ((app (var i) M ⟶_) ● βappᵣvar-inv-eq stp) (βappᵣ (βappᵣvar-inv-stp stp)) == stp
+  βappᵣvar-inv-coh stp = pj2 (pj2 (βappᵣvar-inv stp))
+
+  βappᵣvar-stp : ∀ {n} {i} {M : Trm n}
+                   → Σ[ Trm n ] (M ⟶_) → Σ[ Trm n ] (app (var i) M ⟶_)
+  βappᵣvar-stp z = app (var _) (pj1 z) ,, βappᵣ (pj2 z)
+  βappᵣvar-stp-inv : ∀ {n} {i} {M : Trm n}
+                   → Σ[ Trm n ] (app (var i) M ⟶_) → Σ[ Trm n ] (M ⟶_)
+  βappᵣvar-stp-inv z = βappᵣvar-inv-trm (pj2 z) ,, βappᵣvar-inv-stp (pj2 z)
+
+  βappᵣvar-iso : ∀ {n} {i} {M : Trm n}
+                 → is-iso-pair (βappᵣvar-stp {n} {i} {M}) (βappᵣvar-stp-inv {n} {i} {M})
+  βappᵣvar-iso {n} {i} {M} = eq1 , eq2
+    where eq1 : (NN : Σ[ Trm n ] (M ⟶_)) → βappᵣvar-stp-inv {i = i} (βappᵣvar-stp NN) == NN
+          eq1 = Ση
+          eq2 : (NN : Σ[ Trm n ] (app (var i) M ⟶_)) → βappᵣvar-stp (βappᵣvar-stp-inv NN) == NN
+          eq2 NN = =Σchar (βappᵣvar-inv-eq (pj2 NN)) (βappᵣvar-inv-coh (pj2 NN))
+
+  βappᵣvar-eqv : ∀ {n} {i} {M : Trm n} → is-equiv (βappᵣvar-stp {n} {i} {M})
+  βappᵣvar-eqv {n} {i} {M} = invrt-is-eqv (βappᵣvar-stp-inv ,, βappᵣvar-iso)
+
+  -- Inverting βapp when first term is app
+
+  βappapp-inv : ∀ {n} {P₁ P₂ M N : Trm n} (stp : app (app P₁ P₂) M ⟶ N)
+                 → Σ[ Trm n ] (λ x → Σ[ app P₁ P₂ ⟶ x × (app x M == N) ]
+                     (λ z → ((app (app P₁ P₂) M ⟶_) ● prj2 z) (βappₗ (prj1 z)) == stp))
+                  + Σ[ Trm n ] (λ x → Σ[ M ⟶ x × (app (app P₁ P₂) x == N) ]
+                    (λ z → ((app (app P₁ P₂) M ⟶_) ● prj2 z) (βappᵣ (prj1 z)) == stp))
+  βappapp-inv {n} {P₁} {P₂} {M} {.(app _ M)} (βappₗ stp) =
+    inl (_ ,, ((stp , =rf) ,, =rf))
+  βappapp-inv {n} {P₁} {P₂} {M} {.(app (app P₁ P₂) _)} (βappᵣ stp) =
+    inr (_ ,, ((stp , =rf) ,, =rf))
+
+  βappapp-stp : ∀ {n} {P₁ P₂ M : Trm n}
+                  → Σ[ Trm n ] (λ x → app P₁ P₂ ⟶ x + M ⟶ x)
+                    → Σ[ Trm n ] (app (app P₁ P₂) M ⟶_)
+  βappapp-stp {n} {P₁} {P₂} {M} = ⟨ apptrm ∣∣ appstp ⟩
+    where apptrm : Σ[ Trm n ] (λ x → app P₁ P₂ ⟶ x + M ⟶ x) → Trm n
+          apptrm z = [ (λ s → app (pj1 z) M) ∣ (λ _ → app (app P₁ P₂) (pj1 z)) ] (pj2 z)
+          appstp : (z : Σ[ Trm n ] (λ x → app P₁ P₂ ⟶ x + M ⟶ x))
+                      → app (app P₁ P₂) M ⟶ apptrm z
+          appstp (N ,, stp) = +ind (λ s → app (app P₁ P₂) M ⟶ apptrm (N ,, s))
+                                   βappₗ βappᵣ stp
+
+  βappapp-stp-inv : ∀ {n} {P₁ P₂ M : Trm n}
+                  → Σ[ Trm n ] (app (app P₁ P₂) M ⟶_)
+                    → Σ[ Trm n ] (λ x → app P₁ P₂ ⟶ x + M ⟶ x)
+  βappapp-stp-inv {n} {P₁} {P₂} {M} z =
+    [ ⟨ pj1 ∣∣ (λ u → inl (prj1 (pj1 (pj2 u)))) ⟩
+    ∣ ⟨ pj1 ∣∣ (λ u → inr (prj1 (pj1 (pj2 u)))) ⟩ ]
+    (βappapp-inv (pj2 z))
+
+  βappapp-iso : ∀ {n} {P₁ P₂ M : Trm n}
+        → is-iso-pair (βappapp-stp {n} {P₁} {P₂} {M}) (βappapp-stp-inv {n} {P₁} {P₂} {M})
+  βappapp-iso {n} {P₁} {P₂} {M} = eq1 , eq2
+    where eq1 : ∀ z → βappapp-stp-inv (βappapp-stp z) == z
+          eq1 (N ,, u) = +ind (λ v → βappapp-stp-inv (βappapp-stp (N ,, v)) == N ,, v)
+                              (λ _ → =rf)
+                              (λ _ → =rf)
+                              u         
+          eq2 : ∀ z → βappapp-stp (βappapp-stp-inv z) == z
+          eq2 z = +ind (λ u → βappapp-stp ([ ⟨ pj1 ∣∣ (λ u → inl (prj1 (pj1 (pj2 u)))) ⟩
+                                            ∣ ⟨ pj1 ∣∣ (λ u → inr (prj1 (pj1 (pj2 u)))) ⟩ ] u)
+                               == z)
+                       (λ w → =Σchar (prj2 (pj1 (pj2 w))) (pj2 (pj2 w)))
+                       (λ w → =Σchar (prj2 (pj1 (pj2 w))) (pj2 (pj2 w)))
+                       (βappapp-inv (pj2 z))
+
+  βappapp-eqv : ∀ {n} {P₁ P₂ M : Trm n} → is-equiv (βappapp-stp {n} {P₁} {P₂} {M})
+  βappapp-eqv  {n} {P₁} {P₂} {M} = invrt-is-eqv (βappapp-stp-inv ,, βappapp-iso)
+  
+
+  -- Inverting βapp when first term is lam
+
+  βapplam-inv : ∀ {n M N P} (stp : app (lam {n} M) N ⟶ P)
+                  → Σ[ P == subst-0 M N ] (λ u → β M N == ((app (lam M) N ⟶_) ● u) stp)
+                   + Σ[ Trm (suc n) ] ( λ x → Σ[ M ⟶ x × (P == app (lam x) N) ]
+                    ( λ y → ((app (lam M) N ⟶_) ● (prj2 y)) stp == βappₗ (βlam (prj1 y)) ))
+                   + Σ[ Trm n ] ( λ x → Σ[ N ⟶ x × (P == app (lam M) x) ]
+                      ( λ y → ((app (lam M) N ⟶_) ● (prj2 y)) stp == βappᵣ (prj1 y) ))
+  βapplam-inv (β M N)              = inl (=rf ,, =rf)
+  βapplam-inv (βappₗ (βlam stp))    = inr (inl (_ ,, ((stp , =rf) ,, =rf)))
+  βapplam-inv (βappᵣ stp)           = inr (inr (_ ,, ((stp , =rf) ,, =rf)))
+
+
+  βapplam-stp : ∀ {n} {M : Trm (suc n)} {N : Trm n}
+                  → Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x)
+                      + Σ[ Trm (suc n) ] (M ⟶_)
+                      → Σ[ Trm n ] (app (lam M) N ⟶_)
+  βapplam-stp {n} {M} {N} =
+    [ ⟨ trmn ∣∣ stpn ⟩
+    ∣ ⟨ (λ z → app (lam (pj1 z)) N) ∣∣ (λ z → βappₗ (βlam (pj2 z))) ⟩ ]
+    where trmn : Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x) → Trm n
+          trmn z = [ (λ _ → pj1 z) ∣ (λ _ → app (lam M) (pj1 z)) ] (pj2 z)
+          stpn : (z : Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x))
+                    → app (lam M) N ⟶ trmn z
+          stpn z = +ind (λ u → app (lam M) N ⟶ [ (λ _ → pj1 z)
+                                                 ∣ (λ _ → app (lam M) (pj1 z)) ] u)
+                        (λ p → ((app (lam M) N ⟶_) ● p ⁻¹) (β M N))
+                        βappᵣ
+                        (pj2 z)
+
+  βapplam-stp-inv : ∀ {n} {M : Trm (suc n)} {N : Trm n}
+                      → Σ[ Trm n ] (app (lam M) N ⟶_)
+                        → (Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x)
+                            + Σ[ Trm (suc n) ] (M ⟶_))
+  βapplam-stp-inv {n} {M} {N} z =
+    [ inl ∘ ⟨ (λ _ → pj1 z) ∣∣ inl ∘ pj1 ⟩
+    ∥ inr ∘ ⟨ pj1 ∣∣ (λ w → prj1 (pj1 (pj2 w))) ⟩
+    ∥ inl ∘ ⟨ pj1 ∣∣ (λ w → inr (prj1 (pj1 (pj2 w)))) ⟩
+    ] (βapplam-inv (pj2 z)) 
+
+  βapplam-iso : ∀ {n} {M : Trm (suc n)} {N : Trm n}
+                  → is-iso-pair (βapplam-stp {n} {M} {N}) (βapplam-stp-inv)
+  βapplam-iso {n} {M} {N} = eq1 , eq2
+    where eq1-aux : ∀ {P} (p : P == subst-0 M N)
+                     → (P ,, ((app (lam M) N ⟶_) ● p ⁻¹) (β M N)) == (subst-0 M N ,, β M N)
+          eq1-aux {P} p = =Σchar,, p (transp-back-forth-ptw _ p (β M N))
+          βeq1-aux : ∀ {P} (p : P == subst-0 M N)
+            → βapplam-stp-inv (βapplam-stp (inl (P ,, inl p)))
+            -- = βapplam-stp-inv (P ,, ((app (lam M) N ⟶_) ● p ⁻¹) (β M N))
+                            == inl (subst-0 M N ,, inl =rf)
+          βeq1-aux p = =ap βapplam-stp-inv  (eq1-aux p)
+          eq1 : ∀ z → βapplam-stp-inv (βapplam-stp {n} {M} {N} z) == z
+          eq1 =
+            +ind (λ z → βapplam-stp-inv (βapplam-stp z) == z)
+                 (λ w → +ind (λ v → βapplam-stp-inv (βapplam-stp (inl (pj1 w ,, v))) == inl (pj1 w ,, v))
+                              (λ p → =proof
+               βapplam-stp-inv (βapplam-stp (inl (pj1 w ,, inl p)))   ==[ βeq1-aux p ] /
+               inl (subst-0 M N ,, inl =rf)
+                   ==[ =ap inl (=Σchar (p ⁻¹)
+                                       (transp-inl-ptw _ _ (p ⁻¹) =rf
+                                        • =ap inl (=transp-precmp-rf p))) ]∎
+               inl (pj1 w ,, inl p) ∎)
+                              (λ _ → =ap inl =rf)
+                              (pj2 w)
+                          • =ap inl (Ση w))
+                 (λ w → =ap inr (Ση w))
+
+          arg2 : (z : Σ[ Trm n ] (app (lam M) N ⟶_)) →
+               Σ[ pj1 z == subst-0 M N ] (λ u → β M N == ((app (lam M) N ⟶_) ● u) (pj2 z))
+              + Σ[ Trm (suc n) ] ( λ x → Σ[ M ⟶ x × (pj1 z == app (lam x) N) ]
+               ( λ y → ((app (lam M) N ⟶_) ● (prj2 y)) (pj2 z) == βappₗ (βlam (prj1 y)) ))
+              + Σ[ Trm n ] ( λ x → Σ[ N ⟶ x × (pj1 z == app (lam M) x) ]
+                 ( λ y → ((app (lam M) N ⟶_) ● (prj2 y)) (pj2 z) == βappᵣ (prj1 y) ))
+                   → Σ[ Trm n ] (app (lam M) N ⟶_)
+          arg2 z = [ (λ _ → subst-0 M N ,, β M N)
+                  ∥ (λ w → app (lam (pj1 w)) N ,, βappₗ (βlam (prj1 (pj1 (pj2 w)))))
+                  ∥ (λ w → app (lam M) (pj1 w) ,, βappᵣ (prj1 (pj1 (pj2 w)))) ]
+          arg2-eq : (z : Σ[ Trm n ] (app (lam M) N ⟶_))
+                      → z == arg2 z (βapplam-inv (pj2 z))
+          arg2-eq (.(subst-0 M N) ,, β M N)              = =rf
+          arg2-eq (.(app (lam _) N) ,, βappₗ (βlam stp))  = =rf
+          arg2-eq (.(app (lam M) _) ,, βappᵣ stp)         = =rf
+          eq2 : ∀ z → βapplam-stp (βapplam-stp-inv {n} {M} {N} z) == z
+          eq2 z = =proof
+            βapplam-stp (βapplam-stp-inv z)
+              ==[ =ap (βapplam-stp ∘ βapplam-stp-inv) (arg2-eq z) ] /
+            βapplam-stp (βapplam-stp-inv (arg2 z (βapplam-inv (pj2 z))))
+              ==[ +ind3 (λ u → βapplam-stp (βapplam-stp-inv {n} {M} {N} (arg2 z u)) == z)
+                        (λ w → =Σchar (pj1 w ⁻¹)
+                                       (=ap ((app (lam M) N ⟶_) ● pj1 w ⁻¹) (pj2 w)
+                                        • transp-forth-back-ptw _ (pj1 w) (pj2 z)))
+                        (λ w → =Σchar (prj2 (pj1 (pj2 w)) ⁻¹)
+                          (=ap ((app (lam M) N ⟶_) ● prj2 (pj1 (pj2 w)) ⁻¹) (pj2 (pj2 w) ⁻¹)
+                           • transp-forth-back-ptw _ (prj2 (pj1 (pj2 w))) (pj2 z)))
+                        (λ w → =Σchar (prj2 (pj1 (pj2 w)) ⁻¹)
+                          (=ap ((app (lam M) N ⟶_) ● prj2 (pj1 (pj2 w)) ⁻¹) (pj2 (pj2 w) ⁻¹)
+                           • transp-forth-back-ptw _ (prj2 (pj1 (pj2 w))) (pj2 z)))
+                        (βapplam-inv (pj2 z)) ]∎
+            z ∎
+
+  βapplam-eqv : ∀ {n} {M : Trm (suc n)} {N : Trm n} → is-equiv (βapplam-stp {n} {M} {N})
+  βapplam-eqv {n} {M} {N} = invrt-is-eqv (βapplam-stp-inv ,, βapplam-iso)
+
+
+
+
+{----------------------
   ⟶-prop-aux : ∀ {n M N N'} → app {n} (lam M) N == subst-0 M N' → ¬ (N' ⟶ N)
   ⟶-prop-aux {n} {M} {N} p stp = {!!}
 
   applam-to-subst : ∀ {n M N P} → (p : P == subst-0 M N) → (stp : app (lam {n} M) N ⟶ P)
                       → β M N == ((app (lam M) N ⟶_) ● p) stp
   applam-to-subst {n} p stp = [ (λ z → pj2 z • ●irrelₚₜ (Trm-is-set n) (pj1 z) p stp)
-                              ∥ {!!} ∥ {!!} ] (applam-tric stp)
+                              ∥ {!!} ∥ {!!} ] (βapplam-inv stp)
 
+  -- this may be false (i.e. M ⟶ N is set and not prop)
   ⟶-is-prop : ∀ {n} {M N : Trm n} → isProp (M ⟶ N)
   ⟶-is-prop {n} (β M N) stp2 = {!!}
     where aux : ∀ {P} (stp : app (lam M) N ⟶ P) → (p : P == subst-0 M N)
@@ -560,6 +744,8 @@ module Lambda-Calculus where
   ⟶-is-prop (βlam stp1) (βlam stp2) = =ap βlam (⟶-is-prop stp1 stp2)
   ⟶-is-prop (βappₗ stp1) stp2 = {!!}
   ⟶-is-prop (βappᵣ stp1) stp2 = {!!}
+---------------}
+
 
 
   -- reflexive and transitive closure of the one-step reduction relation
@@ -1036,56 +1222,100 @@ module Lambda-Calculus where
   -- exact enumeration of one-step reductions of a term
   ⟶enmex : ∀ {n} M → Σ[ (Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)) ] is-equiv
 
-  ⟶enmex {n} (var i) = {!!} ,, {!!}
+  -- enumeration of one step reductions from `var i`
+  ⟶enmex {n} (var i) =
+    venm ,, prop-eqv venm N₀-is-prop
+                    (λ x y → N₀ind {λ _ → x == y} (empty y))
+                    empty
+    where venm :  Fin zero → Σ[ Trm n ] (var i ⟶_)
+          venm = N₀ind
+          empty :  Σ[ Trm n ] (var i ⟶_) → Fin zero
+          empty (_ ,, ())
 
+  -- enumeration of one step reductions from `lam M`
   ⟶enmex {n} (lam M) =
-    lenm --⟨ lam ∘ pj1 ∘ ihf ∣∣ (λ i → βlam {n} (pj2 (ihf i))) ⟩
-    ,, {!!}
+    lenm ,, leqv
     where ihf : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
           ihf = pj1 (⟶enmex M)
           iheqv : is-equiv ihf
           iheqv = pj2 (⟶enmex M)
-          lamstp : Σ[ Trm (suc n) ] (M ⟶_) → Σ[ Trm n ] (lam M ⟶_)
-          lamstp = ⟨ lam ∘ pj1 ∣∣ (λ MM → βlam {n} (pj2 MM)) ⟩
-          lemstpeqv : is-equiv lamstp
-          lemstpeqv (N ,, stp) = ((βlam-inv-trm stp ,, βlam-inv-stp stp)
-                                  ,, =Σchar (βlam-inv-eq stp) (βlam-inv-coh stp))
-                                 ,, {!λ ((P ,, stp') ,, eqP) → ?!}
-          --ihr : ∀ i → M ⟶ (ihf i)
-          --ihr i = pj2 (pj1 (⟶enmex M) i)
           lenm : Fin (⟶# (lam M)) → Σ[ Trm n ] (lam M ⟶_)
-          lenm = lamstp ∘ ihf
-          --lam (pj1 (ihf i)) ,, βlam (pj2 (ihf i))
+          lenm = βlam-stp {n} {M} ∘ ihf
           leqv : is-equiv lenm
-          leqv (N ,, stp) = {!⟨_∣∣_⟩!}
-            where NN : Σ[ Trm (suc n) ] --(λ x → M ⟶ x  × (N == lam x))
-                        (λ x → Σ[ M ⟶ x × (lam x == N) ]
-                            λ se → ((lam M ⟶_) ● prj2 se) (βlam (prj1 se)) == stp)
-                  NN = βlam-inv stp
-                  N' : Trm (suc n)
-                  N' = pj1 (βlam-inv stp)
-                  stp' : M ⟶ N'
-                  stp' = βlam-inv-stp stp --prj1 (pj2 (βlam-inv stp))
-                  eq : lam N' == N
-                  eq = βlam-inv-eq stp --prj2 (pj2 (βlam-inv stp))
-                  idx' : Σ[ Fin (⟶# M) ] (λ x → ihf x == N' ,, stp')
-                  idx' = pj1 (iheqv (N' ,, stp'))
-                  idxuq' : (xx' : fib ihf (N' ,, stp')) → xx' == idx'
-                  idxuq' = pj2 (iheqv (N' ,, stp'))
-                  idx-aux : lenm (pj1 idx') == lam N' ,, βlam stp'
-                  idx-aux = =Σchar,, (=ap lam (=ap pj1 (pj2 idx')))
-                                     (=proof
-                    ((lam M ⟶_) ● =ap lam (=ap (λ z → pj1 z) (pj2 idx'))) (βlam (pj2 (ihf (pj1 idx'))))
-                       ==[ {!!} ] /
-                    ((λ x → lam M ⟶ lam (pj1 x)) ● (pj2 idx')) (βlam (pj2 (ihf (pj1 idx'))))
-                       ==[ {!!} ] /
-                    βlam (((λ x → M ⟶ pj1 x) ● (pj2 idx')) (pj2 (ihf (pj1 idx'))))
-                       ==[ {!!} ]∎
-                    βlam stp' ∎)
-                  idx : fib lenm (N ,, stp)
-                  idx = pj1 idx' ,, {!!}
+          leqv = ∘eqv iheqv βlam-eqv
 
-  ⟶enmex {n} (app M₁ M₂) = {!!}
+  -- enumeration of one step reductions from `app (var i) N`
+  ⟶enmex {n} (app (var i) N) =
+    avenm ,, aveqv
+    where ihf : Fin (⟶# N) → Σ[ Trm n ] (N ⟶_)
+          ihf = pj1 (⟶enmex N)
+          iheqv : is-equiv ihf
+          iheqv = pj2 (⟶enmex N)
+          avenm : Fin (⟶# N) → Σ[ Trm n ] (app (var i) N ⟶_)
+          avenm = βappᵣvar-stp {n} {i} {N} ∘ ihf
+          aveqv : is-equiv avenm
+          aveqv = ∘eqv iheqv βappᵣvar-eqv
+
+  -- enumeration of one step reductions from `app (lam M) N`
+  ⟶enmex {n} (app (lam M) N) =
+    alenm ,, aleqv -- this is the tough one
+    where ihMf : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
+          ihMf = pj1 (⟶enmex M)
+          ihMeqv : is-equiv ihMf
+          ihMeqv = pj2 (⟶enmex M)
+          ihNf : Fin (⟶# N) → Σ[ Trm n ] (N ⟶_)
+          ihNf = pj1 (⟶enmex N)
+          ihNeqv : is-equiv ihNf
+          ihNeqv = pj2 (⟶enmex N)
+          aux : Σ[ Trm n ] (_== subst-0 M N) + Σ[ Trm (suc n) ] (M ⟶_) + Σ[ Trm n ] (N ⟶_)
+                   → Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x)
+                        + Σ[ Trm (suc n) ] (M ⟶_)
+          aux = [ inl ∘ ⟨ pj1 ∣∣ (λ z → inl (pj2 z)) ⟩
+                ∥ inr
+                ∥ inl ∘ ⟨ pj1 ∣∣ (λ z → inr (pj2 z)) ⟩ ]
+          aux-invrt : is-invrt aux
+          aux-invrt = auxinv ,, (iddom , idcod)
+            where auxinv : Σ[ Trm n ] (λ x → (x == subst-0 M N) + N ⟶ x)
+                              + Σ[ Trm (suc n) ] (M ⟶_)
+                                → Σ[ Trm n ] (_== subst-0 M N) + Σ[ Trm (suc n) ] (M ⟶_)
+                                     + Σ[ Trm n ] (N ⟶_)
+                  auxinv = [ (λ z → [ (λ p → inl (pj1 z ,, p))
+                                     ∣ (λ s → inr (inr (pj1 z ,, s))) ] (pj2 z))
+                           ∣ inr ∘ inl ]
+                  iddom : ∀ u → auxinv (aux u) == u
+                  iddom = +ind (λ u → auxinv (aux u) == u)
+                               (λ z → =ap inl (Ση z))
+                               (+ind (λ u → auxinv (aux (inr u)) == inr u)
+                                     (λ z → =rf)
+                                     λ z → =ap (inr ∘ inr) (Ση z))
+                  idcod : ∀ u → aux (auxinv u) == u
+                  idcod = +ind (λ u → aux (auxinv u) == u)
+                               (λ z → =ap (aux ∘ auxinv ∘ inl) (Ση⁻¹ z)
+                          • +ind (λ v → aux (auxinv (inl (pj1 z ,, v))) == inl (pj1 z ,, v))
+                                 (λ _ → =rf)
+                                 (λ _ → =rf)
+                                 (pj2 z)
+                          • =ap inl (Ση z))
+                               (λ _ → =rf)
+          alenm : Fin (suc (⟶# M +N ⟶# N)) → Σ[ Trm n ] (app (lam M) N ⟶_)
+          alenm = βapplam-stp {n} {M} {N}
+                    ∘ aux
+                    ∘ Fin+N-fnc {one} {⟶# M +N ⟶# N}
+                                (inl ∘ (λ _ → subst-0 M N ,, =rf))
+                                (inr ∘ Fin+N-fnc {⟶# M} {⟶# N}
+                                                 (inl ∘ ihMf)
+                                                 (inr ∘ ihNf))
+          aleqv : is-equiv alenm
+          aleqv = ∘eqv (∘eqv (Fin+N-fnc-eqv (cntr-eqv (=η⁻¹ (subst-0 M N))
+                                                     (λ _ → subst-0 M N ,, =rf))
+                                           (Fin+N-fnc-eqv ihMeqv ihNeqv))
+                            (invrt-is-eqv aux-invrt))
+                       βapplam-eqv
+  
+  -- enumeration of one step reductions from `app (app M₁ M₂) N`
+  ⟶enmex {n} (app (app M₁ M₂) N) =
+    {!!}
+  -- end of enumeration
 
 
   ⟶enm-inv : ∀ {n} M → (NN : Σ[ Trm n ] (M ⟶_)) → fib (⟶enm M) NN

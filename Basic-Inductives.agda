@@ -62,6 +62,13 @@ module Basic-Inductives where
   +ind C ls rs (inl a) = ls a
   +ind C ls rs (inr b) = rs b
 
+  +ind3 : ∀ {A B C : Set} → (D : A + B + C → Set )
+            → (∀ a → D (inl a)) → (∀ b → D (inr (inl b))) → (∀ c → D (inr (inr c)))
+              → ∀ x → D x
+  +ind3 C ls cs rs (inl a) = ls a
+  +ind3 C ls cs rs (inr (inl b)) = cs b
+  +ind3 C ls cs rs (inr (inr c)) = rs c
+
   -- distributivities
 
   +×+-dist : {A₁ A₂ B₁ B₂ : Set} → (A₁ + B₁) × (A₂ + B₂)

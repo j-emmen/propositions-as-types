@@ -1,6 +1,6 @@
 
 module Nat-and-Fin where
-  open import Identity
+  open import Identity public
 
   -------------------
   -- Some arithmetic
@@ -133,6 +133,7 @@ module Nat-and-Fin where
   Fin+N-trr {zero} lt rt i           = =rf {a = rt i}
   Fin+N-trr {suc n} lt rt i          = Fin+N-trr (lt ∘ fs) rt i
 
+
   Fin+N-ind : ∀ {n m} (C : Fin (n +N m) → Set)
                 → (∀ i → C (Fin+N-inl {n} i)) → (∀ i → C (Fin+N-inr {m = m} i))
                   → ∀ i → C i
@@ -141,16 +142,84 @@ module Nat-and-Fin where
   Fin+N-ind {suc n} {m} C lt rt (fs i)    = Fin+N-ind (λ x → C (fs x)) (λ x → lt (fs x)) rt i
 
   Fin+N-indl : ∀ {n m} {C : Fin (n +N m) → Set}
-                 → (lt : ∀ i → C (Fin+N-inl {n} i)) → (rt : ∀ i → C (Fin+N-inr {m = m} i))
+                 (lt : ∀ i → C (Fin+N-inl {n} i)) (rt : ∀ i → C (Fin+N-inr {m = m} i))
                    → ∀ i → Fin+N-ind C lt rt (Fin+N-inl i) == lt i
   Fin+N-indl {suc n} {m} {C} lt rt fz           = =rf {a = lt fz}
   Fin+N-indl {suc n} {m} {C} lt rt (fs i)       = Fin+N-indl (λ x → lt (fs x)) rt i
 
   Fin+N-indr : ∀ {n m} {C : Fin (n +N m) → Set}
-                 → (lt : ∀ i → C (Fin+N-inl {n} i)) → (rt : ∀ i → C (Fin+N-inr {m = m} i))
+                 (lt : ∀ i → C (Fin+N-inl {n} i)) (rt : ∀ i → C (Fin+N-inr {m = m} i))
                    → ∀ i → Fin+N-ind C lt rt (Fin+N-inr i) == rt i
   Fin+N-indr {zero} {m} {C} lt rt i           = =rf {a = rt i}
   Fin+N-indr {suc n} {m} {C} lt rt i          = Fin+N-indr (λ x → lt (fs x)) rt i
+
+
+  Fin+N-induqg :  ∀ {n m} {C : Fin (n +N m) → Set} {f g : ∀ i → C i}
+                    → (∀ i → f (Fin+N-inl {n} i) == g (Fin+N-inl i))
+                    → (∀ i → f (Fin+N-inr i) == g (Fin+N-inr i))
+                      → ∀ i → f i == g i
+  Fin+N-induqg {f = f} {g} = Fin+N-ind (λ i → f i == g i)
+
+  Fin+N-induq :  ∀ {n m} {C : Fin (n +N m) → Set}
+                   (lt : ∀ i → C (Fin+N-inl {n} i)) (rt : ∀ i → C (Fin+N-inr {m = m} i))
+                   {f : ∀ i → C i}
+                → (∀ i → f (Fin+N-inl i) == lt i) → (∀ i → f (Fin+N-inr i) == rt i)
+                  → ∀ i → f i == Fin+N-ind C lt rt i
+  Fin+N-induq lt rt {f} eql eqr = Fin+N-induqg {f = f} {Fin+N-ind _ lt rt}
+                                               (λ i → eql i • Fin+N-indl lt rt i ⁻¹)
+                                               (λ i → eqr i • Fin+N-indr lt rt i ⁻¹)
+
+  Fin+N-fncuqg :  ∀ {n m} {A : Set} {f g : Fin (n +N m) → A}
+                    → (∀ i → f (Fin+N-inl {n} i) == g (Fin+N-inl i))
+                    → (∀ i → f (Fin+N-inr i) == g (Fin+N-inr i))
+                      → ∀ i → f i == g i
+  Fin+N-fncuqg {f = f} {g} = Fin+N-ind (λ i → f i == g i)
+
+  Fin+N-fncuq :  ∀ {n m} {A : Set} (lt : Fin n → A) (rt : Fin m → A) {f : Fin (n +N m) → A}
+                   → (∀ i → f (Fin+N-inl i) == lt i) → (∀ i → f (Fin+N-inr i) == rt i)
+                     → ∀ i → f i == Fin+N-fnc lt rt i
+  Fin+N-fncuq lt rt {f} eql eqr = Fin+N-fncuqg {f = f} {Fin+N-fnc lt rt}
+                                               (λ i → eql i • Fin+N-trl lt rt i ⁻¹)
+                                               (λ i → eqr i • Fin+N-trr lt rt i ⁻¹)
+
+
+  Fin+N-fnc-invrt : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
+                    → is-invrt f → is-invrt g → is-invrt (Fin+N-fnc (inl ∘ f) (inr ∘ g))
+  Fin+N-fnc-invrt {n} {m}  {A} {B} {f} {g} invf invg =
+    h ,, (h[fg]=id , [fg]h=id)
+    where h : A + B → Fin (n +N m)
+          h = [ Fin+N-inl ∘ pj1 invf ∣ Fin+N-inr ∘ pj1 invg ]
+          h[fg]=id : ∀ i → h (Fin+N-fnc (inl ∘ f) (inr ∘ g) i) == i
+          h[fg]=id = Fin+N-fncuqg {f = h ∘ Fin+N-fnc (inl ∘ f) (inr ∘ g)} {id}
+                                  (λ i → =proof
+                     h (Fin+N-fnc (inl ∘ f) (inr ∘ g) (Fin+N-inl i))
+                                            ==[ =ap h (Fin+N-trl (inl ∘ f) (inr ∘ g) i) ] /
+                     h (inl (f i))          ==[ =ap Fin+N-inl (prj1 (pj2 invf) i) ]∎
+                     -- = Fin+N-inl (pj1 invf (f i))
+                     Fin+N-inl i ∎)
+                                  λ i → =proof
+                     h (Fin+N-fnc (inl ∘ f) (inr ∘ g) (Fin+N-inr i))
+                                            ==[ =ap h (Fin+N-trr (inl ∘ f) (inr ∘ g) i) ] /
+                     h (inr (g i))          ==[ =ap Fin+N-inr (prj1 (pj2 invg) i) ]∎
+                     -- = Fin+N-inr (pj1 invg (g i))
+                     Fin+N-inr i ∎
+          [fg]h=id : ∀ x → Fin+N-fnc (inl ∘ f) (inr ∘ g) (h x) == x
+          [fg]h=id = +ind (λ x → Fin+N-fnc (inl ∘ f) (inr ∘ g) (h x) == x)
+                          (λ a → =proof
+                     Fin+N-fnc (inl ∘ f) (inr ∘ g) (h (inl a))
+                                         ==[ Fin+N-trl (inl ∘ f) (inr ∘ g) (pj1 invf a) ] /
+                     inl (f (pj1 invf a))               ==[ =ap inl (prj2 (pj2 invf) a) ]∎
+                     inl a ∎)
+                          λ b → =proof
+                     Fin+N-fnc (inl ∘ f) (inr ∘ g) (h (inr b))
+                                         ==[ Fin+N-trr (inl ∘ f) (inr ∘ g) (pj1 invg b) ] /
+                     inr (g (pj1 invg b))               ==[ =ap inr (prj2 (pj2 invg) b) ]∎
+                     inr b ∎
+
+  Fin+N-fnc-eqv : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
+                    → is-equiv f → is-equiv g → is-equiv (Fin+N-fnc (inl ∘ f) (inr ∘ g))
+  Fin+N-fnc-eqv eqvf eqvg = invrt-is-eqv (Fin+N-fnc-invrt (eqv-is-invrt eqvf)
+                                                          (eqv-is-invrt eqvg))
 
   -- max of finite stuff
   is-maxN-2 : ∀ n m → Nat → Set
