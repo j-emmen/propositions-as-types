@@ -47,14 +47,17 @@ module Basic-Inductives where
     inl : A → A + B
     inr : B → A + B
 
+  inrl : {A B C : Set} → B → A + B + C
+  inrl {A} {B} {C} = inr ∘ inl
+  inrr : {A B C : Set} → C → A + B + C
+  inrr {A} {B} {C} = inr ∘ inr
+
   [_∣_] : ∀ {A B C : Set} → (A → C) → (B → C) → A + B → C
   [ f ∣ g ] (inl a) = f a
   [ f ∣ g ] (inr b) = g b
 
   +rec3 [_∥_∥_] : ∀ {A B C D : Set} → (A → D) → (B → D) → (C → D) → A + B + C → D
-  +rec3 f g h (inl a) = f a
-  +rec3 f g h (inr (inl b)) = g b
-  +rec3 f g h (inr (inr c)) = h c
+  +rec3 f g h = [ f ∣ [ g ∣ h ] ]
   [ f ∥ g ∥ h ] = +rec3 f g h
 
   +ind : ∀ {A B : Set} → (C : A + B → Set ) → (∀ a → C (inl a)) → (∀ b → C (inr b))
@@ -63,11 +66,20 @@ module Basic-Inductives where
   +ind C ls rs (inr b) = rs b
 
   +ind3 : ∀ {A B C : Set} → (D : A + B + C → Set )
-            → (∀ a → D (inl a)) → (∀ b → D (inr (inl b))) → (∀ c → D (inr (inr c)))
+            → (∀ a → D (inl a)) → (∀ b → D (inrl b)) → (∀ c → D (inrr c))
               → ∀ x → D x
   +ind3 C ls cs rs (inl a) = ls a
   +ind3 C ls cs rs (inr (inl b)) = cs b
   +ind3 C ls cs rs (inr (inr c)) = rs c
+
+  +rec3-dist : ∀ {A₁ A₂ A₃ B₁ B₂ B₃ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂) (f₃ : A₃ → B₃)
+                  → ∀ v → [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] v
+                                == [ inl ∘ f₁ ∣ inr ∘ [ (inl ∘ f₂) ∣ (inr ∘ f₃) ] ] v
+  +rec3-dist f₁ f₂ f₃ = +ind3 (λ v → [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] v
+                                           == [ inl ∘ f₁ ∣ inr ∘ [ inl ∘ f₂ ∣ inr ∘ f₃ ] ] v)
+                              (λ _ → =rf)
+                              (λ _ → =rf)
+                              (λ _ → =rf)
 
   -- distributivities
 
@@ -122,10 +134,10 @@ module Basic-Inductives where
 
   ¬ : Set → Set
   ¬ A = A → N₀
-
+  ¬-is-covar : {A B : Set} → (A → B) → ¬ B → ¬ A
+  ¬-is-covar f = λ nb a → nb (f a)
   ¬¬η : {A : Set} → A → ¬ (¬ A)
   ¬¬η a = λ f → f a
-
   dec→¬¬e : {A : Set} → A + ¬ A → ¬ (¬ A) → A
   dec→¬¬e (inl a) = λ _ → a
   dec→¬¬e (inr na) = λ f → N₀ind (f na)

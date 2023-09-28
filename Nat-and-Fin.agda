@@ -6,15 +6,23 @@ module Nat-and-Fin where
   -- Some arithmetic
   -------------------
 
-  PA4 : ∀ {n} → suc n == zero → N₀
+  PA4 : ∀ {n} → ¬ (suc n == zero)
   PA4 p = =transp fam4 p 0₁ 
         where fam4 : Nat → Set
               fam4 zero = N₀
               fam4 (suc n) = N₁
-
   
   suc-inj : ∀ {n m} → suc n == suc m → n == m
   suc-inj {n} {m} p = =ap prdc p
+
+  PA4g : ∀ {n} → ¬ (suc n == n)
+  PA4g {zero} = PA4
+  PA4g {suc n} = PA4g ∘ suc-inj
+
+  sum-0-is-0 : ∀ {n} {m} → n +N m == zero → n == zero
+  sum-0-is-0 {zero} {m} sumisz = =rf
+  sum-0-is-0' : ∀ {n} {m} → n +N m == zero → m == zero
+  sum-0-is-0' {zero} {m} sumisz = sumisz
 
   sum-succNat : ∀{n} → (f : Fin (suc n) → Nat) → Nat
   sum-succNat {zero} f = f fz
@@ -37,12 +45,66 @@ module Nat-and-Fin where
   Nat-is-set : isSet Nat
   Nat-is-set = HedbergThm Nat-is-decid
 
+  +N-idr : ∀ n → n +N zero == n
+  +N-idr zero = =rf
+  +N-idr (suc n) = =ap suc (+N-idr n)
+  +N-sucswap : ∀ n m → n +N suc m == suc n +N m
+  +N-sucswap zero m = =rf
+  +N-sucswap (suc n) m = =ap suc (+N-sucswap n m) 
+
+  +N-commut : ∀ n m → n +N m == m +N n
+  +N-commut zero m = +N-idr m ⁻¹
+  +N-commut (suc n) zero = =ap suc (+N-idr n)
+  +N-commut (suc n) (suc m) =
+    =ap suc (+N-sucswap n m • =ap suc (+N-commut n m) • +N-sucswap m n ⁻¹)
+
   -- order on Nat
-  infix 5 _≤N_
+  infix 5 _≤N_ _<N_
   _≤N_ : Nat → Nat → Set
   zero ≤N m = N₁
   suc n ≤N zero = N₀
   suc n ≤N suc m = n ≤N m
+
+  _<N_ : Nat → Nat → Set
+  n <N zero = N₀
+  zero <N suc m = N₁
+  suc n <N suc m = n <N m
+
+  z<Ns : ∀ {n} → zero <N suc n
+  z<Ns {n} = 0₁
+  <Ns : ∀ {n} → n <N suc n
+  <Ns {zero} = 0₁
+  <Ns {suc n} = <Ns {n}
+  s<Ns : ∀ {n} {m} → n <N m → suc n <N suc m
+  s<Ns {n} {m} = id
+
+  <N-trn : ∀ {n m l} → n <N m → m <N l → n <N l
+  <N-trn {zero} {m} {suc l} dq1 dq2 = 0₁
+  <N-trn {suc n} {suc m} {suc l} dq1 dq2 = <N-trn {n} {m} {l} dq1 dq2
+
+  <+N : ∀ {n} {m} → n <N m → ∀ k → n <N k +N m
+  <+N dq zero = dq
+  <+N {n} {m} dq (suc k) = <N-trn {n} {k +N m} {suc (k +N m)} (<+N dq k) (<Ns {k +N m})
+  <+N' : ∀ {n} {m} → n <N m → ∀ k → n <N m +N k
+  <+N' {zero} {suc m} dq k = 0₁
+  <+N' {suc n} {suc m} dq k = <+N' {n} {m} dq k
+  <s+N : ∀ n k → n <N suc k +N n
+  <s+N zero k = 0₁
+  <s+N (suc n) k = ((n <N_) ● +N-sucswap k n ⁻¹) (<s+N n k)
+  <+Ns : ∀ n k → n <N n +N suc k
+  <+Ns zero k = 0₁
+  <+Ns (suc n) k = <+Ns n k
+
+  +N<N+N : ∀ {n} {m} → n <N m → ∀ k → k +N n <N k +N m
+  +N<N+N dq zero = dq
+  +N<N+N dq (suc k) = +N<N+N dq k
+  +N<N+N' : ∀ {n} {m} → n <N m → ∀ k → n +N k <N m +N k
+  +N<N+N' {zero} {suc m} dq k = <s+N k m
+  +N<N+N' {suc n} {suc m} dq k = +N<N+N' {n} {m} dq k
+  
+  <→≤ : ∀ {n} {m} → n <N m → n ≤N m
+  <→≤ {zero} {m} dq = 0₁
+  <→≤ {suc n} {suc m} dq = <→≤ {n} dq
 
   suc-non-decr : ∀ n → suc n ≤N n → N₀
   suc-non-decr (suc n) dq = suc-non-decr n dq
@@ -73,6 +135,19 @@ module Nat-and-Fin where
 
   suc-≤ : ∀ {n m} → n ≤N m → n ≤N suc m
   suc-≤ {n} {m} dq = ≤N-trn {n} dq (suc-≤-0 m)
+
+  ≤+N : ∀ {n m} → n ≤N m → ∀ k → n ≤N m +N k
+  ≤+N {zero} {m} dq k = 0₁
+  ≤+N {suc n} {suc m} dq k = ≤+N {n} dq k
+  ≤+N' : ∀ {n m} → n ≤N m → ∀ k → n ≤N k +N m
+  ≤+N' {n} {m} dq zero = dq
+  ≤+N' {n} {m} dq (suc k) = ≤N-trn {n} {k +N m} {suc (k +N m)}
+                                    (≤+N' {n} dq k)
+                                    (suc-≤-0 (k +N m))
+
+  +N-≤ : ∀ {n₁ n₂ m₁ m₂} → n₁ ≤N m₁ → n₂ ≤N m₂ → n₁ +N n₂ ≤N m₁ +N m₂
+  +N-≤ {zero} {n₂} {m₁} {m₂} dq1 dq2 = ≤+N' {n₂} dq2 m₁
+  +N-≤ {suc n₁} {n₂} {suc m₁} {m₂} dq1 dq2 = +N-≤ {n₁} dq1 dq2
 
   ≤anti-sym : ∀ {n m} → n ≤N m → m ≤N n → n == m
   ≤anti-sym {zero} {zero} fz m≤n = =rf
@@ -108,6 +183,12 @@ module Nat-and-Fin where
 
   Fin-is-set : ∀ n → isSet (Fin n)
   Fin-is-set n = HedbergThm (Fin-is-decid {n})
+
+  Fin-=to→ : ∀ {n m} → n == m → Fin n → Fin m
+  Fin-=to→ {n} {m} p = =transp Fin p
+
+  Fin-=to→-inv : ∀ {n m} → (p : n == m) → is-invrt (Fin-=to→ {n} {m} p)
+  Fin-=to→-inv = =transp-is-invrt Fin
 
   Fin+N-fnc : ∀ {n m} {A : Set} → (Fin n → A) → (Fin m → A) → Fin (n +N m) → A
   Fin+N-fnc {zero} lt rt             = rt
@@ -313,5 +394,33 @@ module Nat-and-Fin where
                            (f i)
                            (λ j → {!!})
 -}
+
+  -- canonical lift of a function between finite sets
+  liftFin :  ∀ {n m} → (Fin n → Fin m) → Fin (suc n) → Fin (suc m)
+  liftFin f fz = fz
+  liftFin f (fs i) = fs (f i)
+  -- listFin f = [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
+
+  -- some properties of it
+  liftFin-ptw : {n m : Nat}{f f' : Fin n → Fin m}
+                   → (∀ i → f i == f' i) → ∀ i → liftFin f i == liftFin f' i
+  liftFin-ptw {f = f} {f'} pf fz = =rf {a = fz}
+  liftFin-ptw {f = f} {f'} pf (fs i) = =ap fs (pf i)
+
+  liftFin-cmp : {n m k : Nat}(f : Fin n → Fin m)(g : Fin m → Fin k)
+                       → (i : Fin (suc n)) → liftFin g (liftFin f i) == liftFin (g ∘ f) i
+  liftFin-cmp f g fz = =rf
+  liftFin-cmp f g (fs i) = =rf
+
+  liftFin-cmp⁻¹ : {n m k : Nat}(f : Fin n → Fin m)(g : Fin m → Fin k)
+                       → (i : Fin (suc n)) → liftFin (g ∘ f) i == liftFin g (liftFin f i)
+  liftFin-cmp⁻¹ f g i = liftFin-cmp f g i ⁻¹
+
+  liftFin-sq : {n m : Nat}{f : Fin n → Fin m}{f' : Fin (suc n) → Fin (suc m)}
+               {g : Fin n → Fin (suc n)}{g' : Fin m → Fin (suc m)}
+                 → (∀ i → g' (f i) == f' (g i))
+                   → ∀ i → liftFin g' (liftFin f i) == liftFin f' (liftFin g i)
+  liftFin-sq pf fz = =rf
+  liftFin-sq pf (fs i) = =ap fs (pf i)
 
 -- end of file

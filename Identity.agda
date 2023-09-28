@@ -32,18 +32,22 @@ module Identity where
   =transp : {A : Set}(B : A → Set){a a' : A} → a == a' → B a → B a'
   =transp B {a} = =J (λ x _ → B a → B x) id
 
+  =transp₂ : {A B : Set}(C : A → B → Set){a a' : A}{b b' : B}
+                → a == a' → b == b' → C a b → C a' b'
+  =transp₂ C {a} {a'} {b} {b'} p q = =transp (C a') q ∘ =transp (λ x → C x b) p
+
   infix 40 _●_
   _●_ : {A : Set}(B : A → Set) {a a' : A} → a == a' → B a → B a'
   B ● p = =transp B p
+
+  =ptw : {A : Set}{B : A → Set}{f g : (a : A) → B a} → f == g → (a : A) → f a == g a
+  =ptw {f = f} p a = ((λ x → f a == x a) ● p) =rf
 
   =transpcnst : {A : Set}(B : Set){a a' : A}(p : a == a')(b : B) → ((λ _ → B) ● p) b == b
   =transpcnst B p b = =J (λ x q → ( ((λ _ → B) ● q) b == b )) =rf p
 
   =apd : {A : Set}{B : A → Set}(f : (a : A) → B a){a a' : A}(p : a == a') → (B ● p) (f a) == f a'
   =apd f p = =J (λ x p → (_ ● p) (f _) == f x) =rf p
-
-  =ptw : {A : Set}{B : A → Set}{f g : (a : A) → B a} → f == g → (a : A) → f a == g a
-  =ptw {f = f} p a = ((λ x → f a == x a) ● p) =rf
 
   =sym : {A : Set}{a a' : A} → a == a' → a' == a
   =sym p = ((λ x → x == _) ● p) =rf
@@ -55,6 +59,25 @@ module Identity where
                   → ∀ b → (B ● (=ap f u)) b == ((B ∘' f) ● u) b
   ●=ap-is-● B f = =J (λ x u → ∀ b → (B ● =ap f u) b == ((B ∘' f) ● u) b)
                      (λ _ → =rf)
+
+  ●=ap-is-●⁻¹ : {A' A : Set}(B : A → Set) (f : A' → A) {a a' : A'} → (u : a == a')
+                  → ∀ b → ((B ∘' f) ● u) b == (B ● (=ap f u)) b
+  ●=ap-is-●⁻¹ B f = =J (λ x u → ∀ b → ((B ∘' f) ● u) b == (B ● =ap f u) b)
+                       (λ _ → =rf)
+
+  =ap₂-rfr :  {A₁ A₂ B : Set}(f : A₁ → A₂ → B){a₁ : A₁}{a₂ a₂' : A₂}
+                  → (q : a₂ == a₂') → =ap₂ f =rf q == =ap (f a₁) q
+  =ap₂-rfr {A₁} {A₂} {B} f q = =rf
+  =ap₂-rfr⁻¹ :  {A₁ A₂ B : Set}(f : A₁ → A₂ → B){a₁ : A₁}{a₂ a₂' : A₂}
+                  → (q : a₂ == a₂') → =ap (f a₁) q == =ap₂ f =rf q
+  =ap₂-rfr⁻¹ f q = =sym (=ap₂-rfr f q)
+  =ap₂-rfl :  {A₁ A₂ B : Set}(f : A₁ → A₂ → B){a₁ a₁' : A₁}{a₂ : A₂}
+                  → (p : a₁ == a₁') → =ap₂ f p =rf == =ap (λ x → f x a₂) p
+  =ap₂-rfl {A₁} {A₂} {B} f {a₂ = a₂} = =J (λ _ u → =ap₂ f u =rf == =ap (λ x → f x a₂) u)
+                                          =rf
+  =ap₂-rfl⁻¹ :  {A₁ A₂ B : Set}(f : A₁ → A₂ → B){a₁ a₁' : A₁}{a₂ : A₂}
+                  → (p : a₁ == a₁') → =ap (λ x → f x a₂) p == =ap₂ f p =rf
+  =ap₂-rfl⁻¹ f p = =sym (=ap₂-rfl f p)
  
 
 
@@ -149,6 +172,22 @@ module Identity where
   •⁻¹ : {A : Set}{a₁ a₂ a₃ : A}(p₁ : a₁ == a₂)(p₂ : a₂ == a₃)
            → (p₁ • p₂) ⁻¹ == p₂ ⁻¹ • p₁ ⁻¹
   •⁻¹ p₁ = =J (λ x u → (p₁ • u) ⁻¹ == u ⁻¹ • p₁ ⁻¹) (•idl (p₁ ⁻¹) ⁻¹)
+
+  •⁻¹g : {A : Set}{a₁ a₂ a₃ : A}{p₁ : a₁ == a₂}{p₂ : a₂ == a₃}{p₃ : a₁ == a₃}
+           → p₃ == p₁ • p₂ → p₃ ⁻¹ == p₂ ⁻¹ • p₁ ⁻¹
+  •⁻¹g {A} {a₁} {p₁ = p₁} {p₂} =
+    =J (λ x u → ∀ {y u'} {u'' : a₁ == y} → u'' == u • u' → u'' ⁻¹ == u' ⁻¹ • u ⁻¹)
+       (λ {_} {u'} {u''} tr → =ap =sym (tr • •idl u'))
+       p₁
+       {_} {p₂}
+
+  •⁻¹g⁻¹ : {A : Set}{a₁ a₂ a₃ : A}{p₁ : a₁ == a₂}{p₂ : a₂ == a₃}{p₃ : a₁ == a₃}
+           → p₁ • p₂ == p₃ → p₂ ⁻¹ • p₁ ⁻¹ == p₃ ⁻¹
+  •⁻¹g⁻¹ {A} {a₁} {p₁ = p₁} {p₂} =
+    =J (λ x u → ∀ {y u'} {u'' : a₁ == y} → u • u' == u'' → u' ⁻¹ • u ⁻¹ == u'' ⁻¹)
+       (λ {_} {u'} {u''} tr → =ap =sym (•idl u' ⁻¹ • tr))
+       p₁
+       {_} {p₂}
 
   •⁻¹-⁻¹ : {A : Set}{a₁ a₂ a₃ : A}(p₁ : a₁ == a₂)(p₂ : a₂ == a₃)
            → p₂ ⁻¹ • p₁ ⁻¹ == (p₁ • p₂) ⁻¹
@@ -302,6 +341,26 @@ module Identity where
                   → p == p' → ∀ b →  (B ● p) b == (B ● p') b
   transp-ext-ptw B eq = =ptw (transp-ext B eq)
 
+  transp-flip : {A : Set}(B : A → Set){a a' a'' : A}(p : a == a')
+                   → ∀ {b b'} → (B ● p) b == b' → b == (B ● p ⁻¹) b'
+  transp-flip B = =J (λ _ u → ∀ {b b'} → (B ● u) b == b' → b == (B ● u ⁻¹) b')
+                     id
+
+  transp-flip⁻¹ : {A : Set}(B : A → Set){a a' a'' : A}(p : a == a')
+                   → ∀ {b b'} → b' == (B ● p) b → (B ● p ⁻¹) b' == b
+  transp-flip⁻¹ B = =J (λ _ u → ∀ {b b'} → b' == (B ● u) b → (B ● u ⁻¹) b' == b)
+                       id
+
+  transp-flip-inv : {A : Set}(B : A → Set){a a' a'' : A}(p : a == a')
+                       → ∀ {b b'} → b == (B ● p ⁻¹) b' → (B ● p) b == b'
+  transp-flip-inv B = =J (λ _ u → ∀ {b b'} → b == (B ● u ⁻¹) b' → (B ● u) b == b')
+                         id
+
+  transp-flip-inv⁻¹ : {A : Set}(B : A → Set){a a' a'' : A}(p : a == a')
+                         → ∀ {b b'} → (B ● p ⁻¹) b' == b → b' == (B ● p) b
+  transp-flip-inv⁻¹ B = =J (λ _ u → ∀ {b b'} → (B ● u ⁻¹) b' == b → b' == (B ● u) b)
+                           id
+
   transp-• : {A : Set}(B : A → Set){a a' a'' : A}(p : a == a')(q : a' == a'')
                 → (B ● q) ∘ (B ● p) == B ● (p • q)
   transp-• B p = =J (λ _ u → (B ● u) ∘ (B ● p) == B ● (p • u)) =rf
@@ -375,21 +434,53 @@ module Identity where
   Ση⁻¹ : ∀ {A} {B : A → Set}(z : Σ[ A ] B) → z == (pj1 z) ,, (pj2 z)
   Ση⁻¹ (a ,, b) = =rf
 
+  =Σover,, :  ∀ {A} {B : A → Set} {a : A}
+               → {b b' : B a} → b == b' → _,,_ {A} {B} a b == a ,, b'
+  =Σover,, {a = a} {b} = =J (λ w _ → a ,, b == a ,, w) =rf
+
   =Σover :  ∀ {A} {B : A → Set} {z : Σ[ A ] B}
+               → ∀ {b} → b == pj2 z → pj1 z ,, b == z
+  =Σover {z = z} eq = =Σover,, {a = pj1 z} eq • Ση z
+    -- =J (λ w _ → pj1 z ,, w == z) (Ση z)
+
+  =Σover⁻¹ :  ∀ {A} {B : A → Set} {z : Σ[ A ] B}
                → ∀ {b} → pj2 z == b → z == pj1 z ,, b
-  =Σover {z = z} = =J (λ w _ → z == pj1 z ,, w) (Ση⁻¹ z)
+  =Σover⁻¹ {z = z} eq = Ση⁻¹ z • =Σover,, {a = pj1 z} eq
+    -- =J (λ w _ → z == pj1 z ,, w) (Ση⁻¹ z)
 
   =Σchar,, : ∀ {A} {B : A → Set} {z : Σ[ A ] B} {a'}
                → (u : pj1 z == a') → ∀ {b'} → (B ● u) (pj2 z) == b'
                  → z == a' ,, b'
   =Σchar,, {A} {B} {z} {a'} =
     =J (λ x y → ∀ {b'} → ((B ● y) (pj2 z)) == b' → z == x ,, b')
-       (=Σover {z = z})
+       (=Σover⁻¹ {z = z})
 
   =Σchar : ∀ {A} {B : A → Set}{z z' : Σ[ A ] B}
                → (u : pj1 z == pj1 z') → (B ● u) (pj2 z) == pj2 z'
                  → z == z'
   =Σchar {z = z} {a' ,, b'} u = =Σchar,, {z = z} {a'} u {b'}
+
+  +-EM : {A B : Set} → (v : A + B)
+            → Σ[ A ] (λ x → inl x == v) + Σ[ B ] (λ y → inr y == v)
+  +-EM {A} {B} = +ind (λ v → Σ[ A ] (λ x → inl x == v) + Σ[ B ] (λ y → inr y == v))
+                      (λ a → inl (a ,, =rf))
+                      (λ b → inr (b ,, =rf))
+  inl-inj : ∀ {A B a a'} → inl {A} {B} a == inl a' → a == a'
+  inl-inj =rf = =rf
+  inlinj=id : ∀ {A B a a'} → (eq : inl {A} {B} a == inl a') → =ap inl (inl-inj eq) == eq
+  inlinj=id =rf = =rf
+  injinl=id : ∀ {A B a a'} → (eq : a == a') → inl-inj (=ap (inl {A} {B}) eq) == eq
+  injinl=id =rf = =rf
+  inr-inj : ∀ {A B b b'} → inr {A} {B} b == inr b' → b == b'
+  inr-inj =rf = =rf
+  inrinj=id : ∀ {A B a a'} → (eq : inr {A} {B} a == inr a') → =ap inr (inr-inj eq) == eq
+  inrinj=id =rf = =rf
+  injinr=id : ∀ {A B a a'} → (eq : a == a') → inr-inj (=ap (inr {A} {B}) eq) == eq
+  injinr=id =rf = =rf
+  inl≠inr : ∀ {A B a b} → ¬ (inl {A} {B} a == inr b)
+  inl≠inr ()
+  inr≠inl : ∀ {A B a b} → ¬ (inr {A} {B} b == inl a)
+  inr≠inl ()
 
   fnct-to-List : ∀ {A n} → (Fin n → A) → Σ[ List A ] (λ x → n == lenList x)
   fnct-to-List {A} {zero} f = [] ,, =rf
@@ -397,14 +488,33 @@ module Identity where
     where ih : Σ[ List A ] (λ x → n == lenList x)
           ih = fnct-to-List {A} {n} (f ∘ fs)
 
-  ¬-is-covar : {A B : Set} → (A → B) → ¬ B → ¬ A
-  ¬-is-covar f = λ nb a → nb (f a)
-
   ¬=sym : {A : Set} {a a' : A} → ¬ (a == a') → ¬ (a' == a)
   ¬=sym = ¬-is-covar =sym
-  -- ¬=sym nu = λ u → nu (u ⁻¹) (by =rf)
 
   -- transport and inductive types
+
+  ●pj1 : ∀ {A} {B : A → Set} (C : A → Set){z z' : Σ[ A ] B}(p : z == z')
+           → C ● =pj1 p == (C ∘' pj1) ● p
+  ●pj1 C = =J (λ _ u → C ● =pj1 u == (C ∘' pj1) ● u) =rf
+  ●pj1-ptw : ∀ {A} {B : A → Set} (C : A → Set){z z' : Σ[ A ] B}(p : z == z')
+                   → ∀ c → (C ● =pj1 p) c == ((C ∘' pj1) ● p) c
+  ●pj1-ptw C p = =ptw (●pj1 C p)
+
+  ●pj1⁻¹ : ∀ {A} {B : A → Set} (C : A → Set){z z' : Σ[ A ] B}(p : z == z')
+             → (C ∘' pj1) ● p == C ● =pj1 p
+  ●pj1⁻¹ C p = ●pj1 C p ⁻¹
+  ●pj1⁻¹-ptw : ∀ {A} {B : A → Set} (C : A → Set){z z' : Σ[ A ] B}(p : z == z')
+                 → ∀ c → ((C ∘' pj1) ● p) c == (C ● =pj1 p) c
+  ●pj1⁻¹-ptw C p = =ptw (●pj1⁻¹ C p)
+
+  =ap● : ∀ {A B C} {f : A → B} {g : B → C} {a a' : A} (p : a == a')
+           → ∀ {b} {q : g (f a) == g b} (z : Σ[ f a == b ] (λ x → =ap g x == q))
+               → ((λ x → g (f x) == g b) ● p) q == =ap g (((λ x → f x == b) ● p) (pj1 z))
+  =ap● {A} {B} {C} {f} {g} {a} =
+    =J (λ _ u → ∀ {b} {q : g (f a) == g b} (z : Σ[ f a == b ] (λ x → =ap g x == q))
+              → ((λ x → g (f x) == g b) ● u) q == =ap g (((λ x → f x == b) ● u) (pj1 z)))
+       (λ z → pj2 z ⁻¹)
+    
 
   transp-inl : {A : Set}(B C : A → Set){a a' : A}(p : a == a')
                   → ((λ x → B x + C x) ● p) ∘ inl == inl ∘ (B ● p)
@@ -477,6 +587,9 @@ module Identity where
   isContr→isProp : {A : Set} → isContr A → isProp A
   isContr→isProp cnt = λ a a' → contr= cnt a • contr= cnt a' ⁻¹
 
+  true-prop-is-contr : ∀ {A} → isProp A → A → isContr A
+  true-prop-is-contr prpA a = a ,, λ x → prpA x a
+  
   -- I am using ∀-is-prop here
   isContr-is-prop : (A : Set) → isProp (isContr A)
   isContr-is-prop A z z' = =Σchar (u₁ a₀) (→=isprop _ _)
@@ -523,7 +636,7 @@ module Identity where
 
   -- the fibre of a function
   fib : ∀ {A B} → (f : A → B) → B → Set
-  fib {A} f b = Σ[ A ] (λ x → f x == b)
+  fib {A} f b = Σ[ A ] (λ x → f x == b)  
 
   =transp-fib : ∀ {A B} {f : A → B} → ∀ {b} → (z : fib f b) → ∀ {a} → (p : a == pj1 z)
                   → =transp (λ x → f x == b) (p ⁻¹) (pj2 z) == =ap f p • pj2 z
@@ -587,14 +700,102 @@ module Identity where
   is-equiv : ∀ {A B} → (f : A → B) → Set
   is-equiv f = ∀ b → isContr (fib f b)
 
-  cntr-eqv : {A : Set} → isContr A → (f : N₁ → A) → is-equiv f
-  cntr-eqv {A} cntr f = λ a → (0₁ ,, isprp (f 0₁) a) ,, λ z → =Σchar,, N₁cntr (=isprp _ _)
+  id-is-eqv : ∀ {A} → is-equiv (id {A})
+  id-is-eqv {A} a =
+    (a ,, =rf)
+    ,, λ z → =Σchar,, (pj2 z) (=transp-precmp-inv (pj2 z) (pj2 z) • •invl (pj2 z))
+
+  cntr-N₁-fnc-is-eqv : {A : Set} → isContr A → (f : N₁ → A) → is-equiv f
+  cntr-N₁-fnc-is-eqv {A} cntr f = λ a → (0₁ ,, isprp (f 0₁) a)
+                                         ,, λ z → =Σchar,, N₁cntr (=isprp _ _)
     where isprp : isProp A
           isprp = isContr→isProp cntr
           N₁cntr : ∀ {x} → x == 0₁
           N₁cntr {x} = pj2 N₁-isContr x
           =isprp : {a a' : A} → isProp (a == a')
           =isprp = isProp→=isProp isprp
+
+  infix 5 _≃_
+  _≃_ : (A B : Set) → Set
+  A ≃ B = Σ[ (A → B) ] is-equiv
+
+  N₁≃cntr : {A : Set} → isContr A → N₁ ≃ A
+  N₁≃cntr {A} cntrA = (λ _ → pj1 cntrA) ,, cntr-N₁-fnc-is-eqv cntrA _
+
+  N₀+eqv : {A B O : Set} {f : A → B} (k : O → N₀)
+              → is-equiv f → is-equiv {O + A} [ N₀ind ∘ k ∣ f ]
+  N₀+eqv {A} {B} {O} {f} k eqvf b =
+    (inr (g b) ,, fg=idB b) ,, eq
+    where g : B → A
+          g b = pj1 (pj1 (eqvf b))
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB b = pj2 (pj1 (eqvf b))
+          eq : (z : fib [ N₀ind ∘ k ∣ f ] b) → z == inr (g b) ,, fg=idB b
+          eq z =
+            Ση⁻¹ z
+            • +ind (λ v → (u : [ N₀ind ∘ k ∣ f ] v == b)
+                                         → v ,, u == inr (g b) ,, fg=idB b)
+                   (λ o p → N₀ind {λ _ → _,,_ {_} {λ x → [ N₀ind ∘ k ∣ f ] x == b}
+                                                (inl o) p == _}
+                                   (k o))
+                   (λ a p → =Σchar,, (=ap inr (=pj1 (pj2 (eqvf b) (a ,, p))))
+                                      (=proof
+             ((λ v → [ N₀ind ∘ k ∣ f ] v == b) ● =ap inr (=pj1 (pj2 (eqvf b) (a ,, p)))) p
+                                     ==[ ●=ap-is-● (λ v → [ N₀ind ∘ k ∣ f ] v == b) inr
+                                                      (=pj1 (pj2 (eqvf b) (a ,, p))) p ] /
+             ((λ v → f v == b) ● =pj1 (pj2 (eqvf b) (a ,, p))) p
+                              ==[ ●pj1-ptw (λ v → f v == b) (pj2 (eqvf b) (a ,, p)) p ] /
+             ((λ z → f (pj1 z) == b) ● pj2 (eqvf b) (a ,, p)) p
+                                                       ==[ =pj2 (pj2 (eqvf b) (a ,, p)) ]∎
+             pj2 (pj1 (eqvf b)) ∎))
+                   (pj1 z)
+                   (pj2 z)
+
+  +N₀eqvr : {A B O : Set} {f : A → B} (k : O → N₀)
+              → is-equiv f → is-equiv {A} {O + B} (inr ∘ f)
+  +N₀eqvr {A} {B} {O} {f} k eqvf (inl o) =
+    N₀ind (k o)
+  +N₀eqvr {A} {B} {O} {f} k eqvf (inr b) =
+    (g b ,, =ap inr (fg=idB b)) ,, eq
+    where g : B → A
+          g b = pj1 (pj1 (eqvf b))
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB b = pj2 (pj1 (eqvf b))
+          aux : fib (inr {O} ∘ f) (inr b) → fib f b
+          aux z = pj1 z ,, inr-inj (pj2 z)
+          eq : (z : fib (inr {O} ∘ f) (inr b)) → z == g b ,, =ap inr (fg=idB b)
+          eq z = =Σchar,, (=pj1 (pj2 (eqvf b) (aux z)))
+                          (=proof
+             ((λ x → inr (f x) == inr b) ● =pj1 (pj2 (eqvf b) (aux z))) (pj2 z)
+                                                ==[ ●pj1-ptw (λ x → inr (f x) == inr b)
+                                                             (pj2 (eqvf b) (aux z))
+                                                             (pj2 z)                    ] /
+             ((λ w → inr (f (pj1 w)) == inr b) ● pj2 (eqvf b) (aux z)) (pj2 z)
+             ==[ =ap● {f = f ∘ pj1} {inr}
+                      (pj2 (eqvf b) (aux z))
+                      (pj2 (aux z) ,, inrinj=id (pj2 z)) ] /
+             =ap inr (((λ w → f (pj1 w) == b) ● pj2 (eqvf b) (aux z)) (inr-inj (pj2 z)))
+                                         ==[ =ap (=ap inr) (=pj2 (pj2 (eqvf b) (aux z))) ]∎
+             =ap inr (fg=idB b) ∎)
+
+  eqv-cntr-is-cntr : {A B : Set} → isContr A → {f : A → B} → is-equiv f → isContr B
+  eqv-cntr-is-cntr {A} {B} cntrA {f} eqvf =
+    bsB ,, cnB
+    where g : B → A
+          g b = pj1 (pj1 (eqvf b))
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB b = pj2 (pj1 (eqvf b))
+          bsA : A
+          bsA = pj1 cntrA
+          cnA : ∀ a → a == bsA
+          cnA = pj2 cntrA
+          bsB : B
+          bsB = f bsA
+          cnB : ∀ b → b == bsB
+          cnB b = =proof
+            b           ==[ fg=idB b ⁻¹ ] /
+            f (g b)     ==[ =ap f (cnA (g b)) ]∎
+            bsB ∎
 
   -- using ∀-is-prop
   is-equiv-is-Prop : ∀ {A B f} → isProp (is-equiv {A} {B} f)
@@ -611,6 +812,32 @@ module Identity where
   is-invrt {A} {B} f = Σ[ (B → A) ] (is-iso-pair f)
   is-adj-invrt : ∀ {A B} → (f : A → B) → Set
   is-adj-invrt {A} {B} f = Σ[ (B → A) ] (is-adj-iso-pair f)
+  is-idfull : ∀ {A B} (f : A → B) → Set
+  is-idfull f = ∀ {a a'} (p : f a == f a') → Σ[ a == a' ] (λ x → =ap f x == p)
+
+  idfull-fib-is-prop : ∀ {A B} {f : A → B} → is-idfull f
+                         → ∀ b → isProp (fib f b)
+  idfull-fib-is-prop {A} {B} {f} fullf b z z' =
+    =Σchar z₁=z'₁ z₂=z'₂
+      where z₁=z'₁ : pj1 z == pj1 z'
+            z₁=z'₁ = pj1 (fullf (pj2 z • pj2 z' ⁻¹))
+            z₂=z'₂ : ((λ x → f x == b) ● z₁=z'₁) (pj2 z) == pj2 z'
+            z₂=z'₂ = =proof
+              ((λ x → f x == b) ● z₁=z'₁) (pj2 z)
+                                               ==[ ●=ap-is-●⁻¹ (_== b) f z₁=z'₁ (pj2 z) ] /
+              ((_== b) ● =ap f z₁=z'₁) (pj2 z)
+                                          ==[ =transp-precmp-inv (=ap f z₁=z'₁) (pj2 z) ] /
+              (=ap f z₁=z'₁) ⁻¹ • pj2 z
+                ==[ •extr (pj2 z) ( •⁻¹g {p₂ = pj2 z' ⁻¹} (pj2 (fullf (pj2 z • pj2 z' ⁻¹))) )
+                                                          • •ass⁻¹ _ (pj2 z ⁻¹) (pj2 z) ] /
+              (pj2 z' ⁻¹) ⁻¹ • pj2 z ⁻¹ • pj2 z
+                                        ==[ •idrg-inv (•invl (pj2 z)) (⁻¹⁻¹=id (pj2 z')) ]∎
+              pj2 z' ∎
+
+  =transp-is-invrt : {A : Set}(B : A → Set){a a' : A} (p : a == a')
+                        → is-invrt (B ● p)
+  =transp-is-invrt {A} B p =
+    B ● (p ⁻¹) ,, (transp-forth-back-ptw B p , transp-back-forth-ptw B p)
 
   ∘is-invrt : ∀ {A B C} {f : A → B}{g : B → C}
                  → is-invrt f → is-invrt g → is-invrt (g ∘ f)
@@ -628,8 +855,65 @@ module Identity where
           fi = pj1 invf
           gi : C → B
           gi = pj1 invg
-          
-  
+
+  inv-trn-pre : ∀ {A B C} {f : A → B} {g : B → C} {h : A → C}
+              → (∀ a → g (f a) == h a) → is-invrt f → is-invrt h → is-invrt g
+  inv-trn-pre {A} {B} {C} {f} {g} {h} eq invf invh =
+    (f ∘ h') ,, (iddom , idcod)
+    where f' : B → A
+          f' = pj1 invf
+          ff'=idB : ∀ b → f (f' b) == b
+          ff'=idB = prj2 (pj2 invf)
+          h' : C → A
+          h' = pj1 invh
+          h'h=idA : ∀ a → h' (h a) == a
+          h'h=idA = prj1 (pj2 invh)
+          hh'=idC : ∀ c → h (h' c) == c
+          hh'=idC = prj2 (pj2 invh)
+          iddom : ∀ b → (f ∘ h') (g b) == b
+          iddom b = =proof
+            (f ∘ h') (g b)            ==[ =ap (f ∘ h' ∘ g) (ff'=idB b ⁻¹) ] /
+            (f ∘ h') (g (f (f' b)))   ==[ =ap (f ∘ h') (eq (f' b)) ] /
+            (f ∘ h' ∘ h) (f' b)       ==[ =ap f (h'h=idA (f' b)) ] /
+            f (f' b)                 ==[ ff'=idB b ]∎
+            b ∎
+          idcod : ∀ c → g (f (h' c)) == c
+          idcod c = =proof
+            g (f (h' c))            ==[ eq (h' c) ] /
+            h (h' c)                ==[ hh'=idC c ]∎
+            c ∎
+
+  inv-trn-post : ∀ {A B C} {f : A → B} {g : B → C} {h : A → C}
+              → (∀ a → g (f a) == h a) → is-invrt g → is-invrt h → is-invrt f
+  inv-trn-post {A} {B} {C} {f} {g} {h} eq invg invh =
+    (h' ∘ g) ,, (iddom , idcod)
+    where g' : C → B
+          g' = pj1 invg
+          g'g=idB : ∀ b → g' (g b) == b
+          g'g=idB = prj1 (pj2 invg)
+          gg'=idC : ∀ c → g (g' c) == c
+          gg'=idC = prj2 (pj2 invg)
+          h' : C → A
+          h' = pj1 invh
+          h'h=idA : ∀ a → h' (h a) == a
+          h'h=idA = prj1 (pj2 invh)
+          hh'=idC : ∀ c → h (h' c) == c
+          hh'=idC = prj2 (pj2 invh)
+          iddom : ∀ a → (h' ∘ g) (f a) == a
+          iddom a = =proof
+            (h' ∘ g) (f a)         ==[ =ap h' (eq a) ] /
+            h' (h a)               ==[ h'h=idA a ]∎
+            a ∎
+          idcod : ∀ b → f (h' (g b)) == b
+          idcod b = =proof
+            f (h' (g b))               ==[ g'g=idB (f (h' (g b))) ⁻¹ ] /
+            (g' ∘ g) (f (h' (g b)))    ==[ =ap g' (eq (h' (g b))) ] /
+            (g' ∘ h) (h' (g b))        ==[ =ap g' (hh'=idC (g b)) ] /
+            g' (g b)                  ==[ g'g=idB b ]∎
+            b ∎
+
+
+
   eqv-is-invrt : ∀ {A B} {f : A → B} → is-equiv f → is-invrt f
   eqv-is-invrt {A} {B} {f} eqvf = g ,, (gf=idA , fg=idB)
     where g : B → A
@@ -732,8 +1016,7 @@ module Identity where
 
 
   -- every adjoint-invertible map is full on identities
-  adj-invrt-is-full : ∀ {A B} {f : A → B} → is-adj-invrt f
-                         → ∀ {a a'} → (p : f a == f a') → Σ[ a == a' ] (λ x → =ap f x == p)
+  adj-invrt-is-full : ∀ {A B} {f : A → B} → is-adj-invrt f → is-idfull f
   adj-invrt-is-full {A} {B} {f} adjinv {a} {a'} p =
     eqA ,, (=proof
     =ap f eqA            ==[ =ap• f (gf=idA a ⁻¹) (=ap g p • gf=idA a')  ] /
@@ -768,8 +1051,7 @@ module Identity where
         =ap f (gf=idA a) • p ∎
 
   -- it follows that every invertible map is full on identities too
-  invrt-is-full : ∀ {A B} {f : A → B} → is-invrt f → ∀ {a a'} → (p : f a == f a')
-                      → Σ[ a == a' ] (λ x → =ap f x == p)
+  invrt-is-full : ∀ {A B} {f : A → B} → is-invrt f → is-idfull f
   invrt-is-full {A} {B} {f} inv = adj-invrt-is-full (invrt-is-adj inv)
 
   -- and that every adjoint-invertible map is an equivalence
@@ -814,7 +1096,6 @@ module Identity where
   invrt-is-eqv : ∀ {A B} {f : A → B} → is-invrt f → is-equiv f
   invrt-is-eqv {A} {B} {f} inv = adj-invrt-is-eqv (invrt-is-adj inv)
 
-
   ∘eqv : {A B C : Set}{f : A → B}{g : B → C}
              → is-equiv f → is-equiv g → is-equiv (g ∘ f)
   ∘eqv {A} {B} {C} {f} {g} eqvf eqvg = invrt-is-eqv (∘is-invrt invf invg)
@@ -827,5 +1108,126 @@ module Identity where
                → is-equiv f
   prop-eqv {A} {B} f prpA prpB g = invrt-is-eqv (g ,, ((λ a → prpA _ _) , (λ b → prpB _ _)))
 
+  ≃trns : ∀ {A B C} → A ≃ B → B ≃ C → A ≃ C
+  ≃trns {A} {B} {C} eqv1 eqv2 = (pj1 eqv2 ∘ pj1 eqv1) ,, ∘eqv (pj2 eqv1) (pj2 eqv2)  
+  ≃sym : ∀ {A B} → A ≃ B → B ≃ A
+  ≃sym {A} {B} eqv = g ,, invrt-is-eqv (f ,, ((fg=idB , gf=idA)))
+    where f : A → B
+          f = pj1 eqv
+          inv : is-invrt f
+          inv = eqv-is-invrt (pj2 eqv)
+          g : B → A
+          g = pj1 inv
+          gf=idA : ∀ a → g (f a) == a
+          gf=idA = prj1 (pj2 inv)
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB = prj2 (pj2 inv)
+
+  =ptw→fib-eqv : ∀ {A B} {f g : A → B} → (∀ a → f a == g a)
+                → ∀ b → fib f b ≃ fib g b
+  =ptw→fib-eqv {A} {B} {f} {g} eq b = ·eq ,, invrt-is-eqv (eq· ,, (iddom , idcod))
+    where ·eq : fib f b → fib g b
+          ·eq z = (pj1 z) ,, eq (pj1 z) ⁻¹ • pj2 z
+          eq· : fib g b → fib f b
+          eq· z = (pj1 z) ,, eq (pj1 z) • pj2 z
+          iddom : ∀ z → eq· (·eq z) == z
+          iddom z = =Σover (•ass (eq (pj1 z)) _ (pj2 z)
+                            • •idlg-inv (•invr (eq (pj1 z))) =rf)
+          idcod : ∀ z → ·eq (eq· z) == z
+          idcod z = =Σover (•ass _ (eq (pj1 z)) (pj2 z)
+                            • •idlg-inv (•invl (eq (pj1 z))) =rf)
+
+  =ptw-eqv-is-eqv : ∀ {A B f g} → is-equiv {A} {B} f → (∀ x → f x == g x) → is-equiv g
+  =ptw-eqv-is-eqv {A} {B} {f} {g} eqvf eq b =
+    eqv-cntr-is-cntr {fib f b} (eqvf b) (pj2 (=ptw→fib-eqv eq b))
+
+  -- sums of equivalences are equivalences
+  
+  +fib-inl : {A₁ A₂ B₁ B₂ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂)
+                 → ∀ b₁ → fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inl b₁) ≃ fib f₁ b₁
+  +fib-inl {A₁} {A₂} {B₁} {B₂} f₁ f₂ b₁ = f ,, invrt-is-eqv (g ,, (gf=id , fg=id))
+    where g : fib f₁ b₁ → fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inl b₁)
+          g = ⟨ inl ∘ pj1 ∣∣ (λ z → =ap inl (pj2 z)) ⟩
+          f : fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inl b₁) → fib f₁ b₁
+          f z = +ind (λ v → [ inl ∘ f₁ ∣ inr ∘ f₂ ] v == inl b₁ → fib f₁ b₁)
+                     (λ a eq → a ,, inl-inj eq)
+                     (λ _ eq → N₀ind (inr≠inl eq))
+                     (pj1 z)
+                     (pj2 z)
+          gf=id : ∀ z → g (f z) == z
+          gf=id z = +ind (λ v → (eq : [ inl ∘ f₁ ∣ inr ∘ f₂ ] v == inl b₁) → g (f (v ,, eq)) == (v ,, eq))
+                         (λ _ eq → =Σover (inlinj=id eq))
+                         (λ b eq → N₀ind {λ _ → g (f (inr b ,, eq)) == _} (inr≠inl eq))
+                         (pj1 z)
+                         (pj2 z)
+                    • Ση z
+          fg=id : ∀ z → f (g z) == z
+          fg=id z = =Σover (injinl=id (pj2 z))
+
+  +fib-inr : {A₁ A₂ B₁ B₂ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂)
+                 → ∀ b₂ → fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inr b₂) ≃ fib f₂ b₂
+  +fib-inr {A₁} {A₂} {B₁} {B₂} f₁ f₂ b₂ = f ,, invrt-is-eqv (g ,, (gf=id , fg=id))
+    where f : fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inr b₂) → fib f₂ b₂
+          f z = +ind (λ v → [ inl ∘ f₁ ∣ inr ∘ f₂ ] v == inr b₂ → fib f₂ b₂)
+                     (λ _ eq → N₀ind (inl≠inr eq))
+                     (λ b eq → b ,, inr-inj eq)
+                     (pj1 z)
+                     (pj2 z)
+          g : fib f₂ b₂ → fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] (inr b₂)
+          g = ⟨ inr ∘ pj1 ∣∣ (λ z → =ap inr (pj2 z)) ⟩
+          gf=id : ∀ z → g (f z) == z
+          gf=id z = +ind (λ v → (eq : [ inl ∘ f₁ ∣ inr ∘ f₂ ] v == inr b₂) → g (f (v ,, eq)) == (v ,, eq))
+                         (λ b eq → N₀ind {λ _ → g (f (inl b ,, eq)) == _} (inl≠inr eq))
+                         (λ _ eq → =Σover (inrinj=id eq))
+                         (pj1 z)
+                         (pj2 z)
+                    • Ση z
+          fg=id : ∀ z → f (g z) == z
+          fg=id z = =Σover (injinr=id (pj2 z))
+
+  +eqv : {A₁ A₂ B₁ B₂ : Set} {f₁ : A₁ → B₁} {f₂ : A₂ → B₂}
+              → is-equiv f₁ → is-equiv f₂ → is-equiv [ inl ∘ f₁ ∣ inr ∘ f₂ ]
+  +eqv {A₁} {A₂} {B₁} {B₂} {f₁} {f₂} eqv₁ eqv₂ =
+    +ind (λ v → isContr (fib [ inl ∘ f₁ ∣ inr ∘ f₂ ] v))
+         (λ b₁ → eqv-cntr-is-cntr (eqv₁ b₁) (pj2 (≃sym (+fib-inl f₁ f₂ b₁))))
+         (λ b₂ → eqv-cntr-is-cntr (eqv₂ b₂) (pj2 (≃sym (+fib-inr f₁ f₂ b₂))))
+
+
+  +fib3-inl : {A₁ A₂ A₃ B₁ B₂ B₃ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂) (f₃ : A₃ → B₃)
+                   →  ∀ b₁ → fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] (inl b₁) ≃ fib f₁ b₁
+  +fib3-inl {A₁} {A₂} {A₃} {B₁} {B₂} {B₃} f₁ f₂ f₃ b₁ =
+    ≃trns (=ptw→fib-eqv (+rec3-dist f₁ f₂ f₃) (inl b₁))
+          (+fib-inl f₁ [ inl ∘ f₂ ∣ inr ∘ f₃ ] b₁)
+
+  +fib3-inrl : {A₁ A₂ A₃ B₁ B₂ B₃ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂) (f₃ : A₃ → B₃)
+                   →  ∀ b₂ → fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] (inrl b₂) ≃ fib f₂ b₂
+  +fib3-inrl {A₁} {A₂} {A₃} {B₁} {B₂} {B₃} f₁ f₂ f₃ b₂ =
+    (pj1 eqv2 ∘ pj1 eqv1) ,, ∘eqv (pj2 eqv1) (pj2 eqv2)
+    where eqv1 : fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] (inrl b₂)
+                    ≃ fib [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inl b₂)
+          eqv1 = ≃trns (=ptw→fib-eqv (+rec3-dist f₁ f₂ f₃) (inr (inl b₂)))
+                       (+fib-inr f₁ [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inl b₂))
+          eqv2 : fib [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inl b₂) ≃ fib f₂ b₂
+          eqv2 = +fib-inl f₂ f₃ b₂
+
+  +fib3-inrr : {A₁ A₂ A₃ B₁ B₂ B₃ : Set} (f₁ : A₁ → B₁) (f₂ : A₂ → B₂) (f₃ : A₃ → B₃)
+                   →  ∀ b₃ → fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] (inrr b₃) ≃ fib f₃ b₃
+  +fib3-inrr {A₁} {A₂} {A₃} {B₁} {B₂} {B₃} f₁ f₂ f₃ b₃ =
+    (pj1 eqv2 ∘ pj1 eqv1) ,, ∘eqv (pj2 eqv1) (pj2 eqv2)
+    where eqv1 : fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] (inrr b₃)
+                    ≃ fib [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inr b₃)
+          eqv1 = ≃trns (=ptw→fib-eqv (+rec3-dist f₁ f₂ f₃) (inr (inr b₃)))
+                       (+fib-inr f₁ [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inr b₃))
+          eqv2 : fib [ inl ∘ f₂ ∣ inr ∘ f₃ ] (inr b₃) ≃ fib f₃ b₃
+          eqv2 = +fib-inr f₂ f₃ b₃
+
+  +eqv3 : {A₁ A₂ A₃ B₁ B₂ B₃ : Set} {f₁ : A₁ → B₁} {f₂ : A₂ → B₂} {f₃ : A₃ → B₃}
+              → is-equiv f₁ → is-equiv f₂ → is-equiv f₃
+                → is-equiv [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ]
+  +eqv3 {A₁} {A₂} {A₃} {B₁} {B₂} {B₃} {f₁} {f₂} {f₃} eqv₁ eqv₂ eqv₃ =
+    +ind3 (λ v → isContr (fib [ inl ∘ f₁ ∥ inrl ∘ f₂ ∥ inrr ∘ f₃ ] v))
+          (λ b₁ → eqv-cntr-is-cntr (eqv₁ b₁) (pj2 (≃sym (+fib3-inl f₁ f₂ f₃ b₁))))
+          (λ b₂ → eqv-cntr-is-cntr (eqv₂ b₂) (pj2 (≃sym (+fib3-inrl f₁ f₂ f₃ b₂))))
+          (λ b₃ → eqv-cntr-is-cntr (eqv₃ b₃) (pj2 (≃sym (+fib3-inrr f₁ f₂ f₃ b₃))))
 
 -- end of file
