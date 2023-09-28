@@ -923,6 +923,21 @@ module Identity where
           fg=idB : ∀ b → f (g b) == b
           fg=idB b = pj2 (pj1 (eqvf b))
 
+  +N₀invrtr : {A B O : Set} {f : A → B} (k : O → N₀)
+              → is-invrt f → is-invrt {A} {O + B} (inr ∘ f)
+  +N₀invrtr {A} {B} {O} {f} k invf =
+    [ N₀ind ∘ k ∣ g ]
+    ,, (gf=idA
+    , +ind (λ v → (inr ∘ f) ([ N₀ind ∘ k ∣ pj1 invf ] v) == v)
+           (λ o → N₀ind {λ _ →  inr (f (N₀ind (k o))) == inl o} (k o))
+           λ b → =ap inr (fg=idB b))
+    where g : B → A
+          g = pj1 invf
+          gf=idA : ∀ a → g (f a) == a
+          gf=idA = prj1 (pj2 invf)
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB = prj2 (pj2 invf)
+          
 
   -- every invertible function is adjoint-invertible
   iso-pair-is-adj : ∀ {A B} {f : A → B}{g : B → A}

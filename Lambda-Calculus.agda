@@ -1577,6 +1577,7 @@ the last two clauses do NOT hold definitionally
   ⟶#app+not-lam {n} {lam M} N nlam =           N₀ind (nlam (M ,, =rf))
   ⟶#app+not-lam {n} {app M₁ M₂} N nlam =       =rf
 
+{- one-to-one enumeration below
   -- enumeration of one-step reductions of a term
   ⟶enm : ∀ {n} M → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
   ⟶enm {n} (lam M) i =
@@ -1635,7 +1636,7 @@ the last two clauses do NOT hold definitionally
                   f₁ j = app (pj1 (enmM₁ j)) M₂ ,, βappₗ (pj2 (enmM₁ j))
                   f₂ : Fin (⟶# M₂) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
                   f₂ j = app M₁ (pj1 (enmM₂ j)) ,, βappᵣ (pj2 (enmM₂ j))
-
+-}
 
   -- exact enumeration of one-step reductions of a term
   ⟶enmex : ∀ {n} M → Σ[ (Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)) ] is-equiv
@@ -1664,6 +1665,7 @@ the last two clauses do NOT hold definitionally
 
   -- enumeration of one step reductions from `app M N`
   -- doing induction on `M` is fishy (and Agda complains about termination if we do)
+  -- since we would need to enumerate reductions from `app M₁ M₂` in the case `M = app M₁ M₂`
   -- hence try propositionally instead
   ⟶enmex {n} (app M N) =
     aenm ,, aeqv
@@ -1704,9 +1706,8 @@ the last two clauses do NOT hold definitionally
                  (λ z → ∘is-invrt {f = Fin-=to→ (⟶#app+not-lam N z ⁻¹)}
                                    {inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf)}
                                    (Fin-=to→-inv (⟶#app+not-lam N z ⁻¹))
-                                   (eqv-is-invrt (+N₀eqvr z (invrt-is-eqv
-                                          (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
-                                                           (eqv-is-invrt ihNeqv))))))
+                                   (+N₀invrtr z (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
+                                                                 (eqv-is-invrt ihNeqv)) ))
                  Mlam-or-not
           aenm : Fin (⟶# (app M N)) → Σ[ Trm n ] (app M N ⟶_)
           aenm = βapp-stp {n} {M} {N} ∘ aux Mlam-or-not
@@ -1714,9 +1715,10 @@ the last two clauses do NOT hold definitionally
           aeqv = ∘eqv (invrt-is-eqv aux-inv) (βapp-eqv {n} {M} {N})
   -- end of enumeration
 
-
-  ⟶enm-inv : ∀ {n} M → (NN : Σ[ Trm n ] (M ⟶_)) → fib (⟶enm M) NN
-  ⟶enm-inv M NN = {!!}
+  ⟶enm : ∀ {n} M → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
+  ⟶enm M = pj1 (⟶enmex M)
+  ⟶enm-invrt : ∀ {n} (M : Trm n) → is-invrt (⟶enm M)
+  ⟶enm-invrt M = eqv-is-invrt (pj2 (⟶enmex M))
 
   strnrm-bound : ∀ {n} {M : Trm n} → (nn : ∀ {N} → M ⟶ N → isStrNrm {n} N)
                  → Σ[ Nat ] (λ x → ∀ {N} → M ⟶ N → isStrNrmₗₑᵥ {n} x N)
@@ -1736,7 +1738,7 @@ the last two clauses do NOT hold definitionally
 
 
   strnrm-any-stp : ∀ {n M} → (∀ {N} → M ⟶ N → isStrNrm {n} N)
-                     → ∀ {N} → M ⟶ N → isStrNrm M
+                     → ∀ {N} → M ⟶ N → isStrNrm M -- does it make sense?
   strnrm-any-stp {n} snstp stp =
     suc (pj1 (snstp stp)) ,, strnrm-stp {!!}
     -- strnrm-stp (λ stp' → {!pj2 (snstp stp)!})
