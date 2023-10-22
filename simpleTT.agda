@@ -1,6 +1,7 @@
+{-# OPTIONS --without-K #-}
 
 module simpleTT (A : Set) where
-  open import Basic-Inductives
+  open import Nat-and-Fin public
   open import Lambda-Calculus public
 
   ----------------
@@ -389,6 +390,7 @@ module simpleTT (A : Set) where
           aux fz = eqv (fs fz)
   σdiag-π : ∀ {T} → (T ∣ T ∣ []) ◂ (T ∣ []) ∶ pr₁₁
   σdiag-π = ←to◂ {!!} (λ _ → =rf) (σdiag λ _ → =rf)
+  -- luckily goal ?5 seems to be false
 
   -- term sections are substitutions
   σ-trmsect : ∀ {Γ T M} → Γ ⊢ M ∶ T → T ∣ Γ ← Γ ∶ trmsect M
@@ -408,15 +410,16 @@ module simpleTT (A : Set) where
   ---------------------
   -- subject reduction
   ---------------------
-  subj-red : ∀ {Γ T M N} → Γ ⊢ M ∶ T → M ⟶ N → Γ ⊢ N ∶ T
-  subj-red {M = app (lam M) N} {.(subst-all M (trmsect N))} der (β M N) =
+  subj-red : ∀ {Γ T M N} → M ⟶ N → Γ ⊢ M ∶ T → Γ ⊢ N ∶ T
+  subj-red {M = app (lam M) N} {.(subst-all M (trmsect N))} (β M N) der =
     σ-subst-0 (⊢-app-premᵣ der) (⊢-abs-prem (⊢-app-premₗ der))
-  subj-red {M = lam M} {lam N} (⊢-abs der) (βlam stp) =
-    ⊢-abs (subj-red der stp)
-  subj-red {M = app M L} {app N L} (⊢-app der₁ der₂) (βappₗ stp) =
-    ⊢-app (subj-red der₁ stp) der₂
-  subj-red {M = app L M} {app L N} (⊢-app der₁ der₂) (βappᵣ stp) =
-    ⊢-app der₁ (subj-red der₂ stp)
+  subj-red {M = lam M} {lam N} (βlam stp) (⊢-abs der) =
+    ⊢-abs (subj-red stp der)
+  subj-red {M = app M L} {app N L} (βappₗ stp) (⊢-app der₁ der₂) =
+    ⊢-app (subj-red stp der₁) der₂
+  subj-red {M = app L M} {app L N} (βappᵣ stp) (⊢-app der₁ der₂) =
+    ⊢-app der₁ (subj-red stp der₂)
+  -- light grey indicates that the clauses do NOT hold definitionally
 
 
   -- lam M is a canonical form
@@ -438,28 +441,66 @@ module simpleTT (A : Set) where
           stp' : app M N ⟶ subst-0 M' N
           stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
 
-  -- reducibility candidates
-  data red-cand-app {n} (M : Trm n) : (T : Ty) → Set where
 
+  -- reducibility candidates
 {-
-  -- this definition makes red-can not strictly positive
+  -- it seems that the straightforward inductive definition of `red-cand` 
+  -- is NOT strictly positive
   data red-cand {n} (M : Trm n) : (T : Ty) → Set where
     rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
-    rc-⇒ : ∀ {T S} → (∀ {N} → red-can {n} N T → red-cand (app M N) S) → red-cand M (T ⇒ S)
+    rc-⇒ : ∀ {T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S)
+                   → red-cand M (T ⇒ S)
 -}
 
+  -- so define it by induction into the universe `Set`
+  red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
+  red-cand {n} M (atm a) = isStrNrm M
+  red-cand {n} M (T ⇒ S) = ∀ {N} → red-cand N T → red-cand (app M N) S
+  rc-atm : ∀ {n M} {a : A} → isStrNrm {n} M → red-cand M (atm a)
+  rc-atm nrm = nrm
+  rc-⇒ : ∀ {n M T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S) → red-cand M (T ⇒ S)
+  rc-⇒ rcapp = rcapp
+  rc-ind : (C : ∀ {n M T} → red-cand {n} M T → Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C (rc-atm {a = a} nrm))
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C {T = T ⇒ S} (rc-⇒ fnc))
+                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
+  rc-ind C Catm Cfnc {T = atm a} = Catm {a = a}
+  rc-ind C Catm Cfnc {T = T ⇒ S} = Cfnc
+  rc-rec : (C : Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C)
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C)
+                → ∀ {n M T} → (rc : red-cand {n} M T) → C
+  rc-rec C = rc-ind (λ _ → C)
 
-  red-cand-ind : ∀ {n} → (M : Trm n) → (T : Ty) → Set
-  red-cand-ind {zero} = red-cand-aux₀
-    where data red-cand-aux₀ : ∀ (M : Trm zero) → (T : Ty) → Set where
-            rc-atm₀ : ∀ {M} {a} → isStrNrm M → red-cand-aux₀ M (atm a)
-  red-cand-ind {suc n} = red-cand-auxₛ
-    where data red-cand-auxₛ : (M : Trm (suc n)) → (T : Ty) → Set where
-            rc-atm : ∀ {M} {a} → isStrNrm {suc n} M → red-cand-auxₛ M (atm a)
-            rc-⇒ : ∀ {M : Trm (suc n)} {T} {S}
-                      → (∀ {N} → red-cand-ind {n} N T → red-cand-ind {n} (subst-0 M N) S)
-                        → red-cand-auxₛ M (T ⇒ S)
-  
+{-
+  rc-ind-aux : (C : ∀ {n M T} → red-cand {n} M T → Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a))
+                   → C {T = atm a} (rc-atm {a = a} nrm))
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S))
+                   → (∀ {N} s → C {n} {N} {T} s → C {T = S} (fnc s))
+                     → C {T = T ⇒ S} (rc-⇒ fnc))
+                → ∀ {n M T S} → (fnc : ∀ {N} → red-cand {n} N T → red-cand (app M N) S)
+                  → ∀ {N} (rc : red-cand {n} N T) → C rc → C (fnc rc)
+  rc-ind-aux C Catm Cfnc fnc rc = rc-ind Fam {!!} {!!} rc fnc 
+    where Fam : ∀ {n N T} → red-cand {n} N T → Set
+          Fam {n} {N} {T}  rc =
+              ∀ {M S} → (fnc : ∀ {P} → red-cand {n} P T → red-cand (app M P) S)
+                        → C rc → C (fnc rc)
+
+  rc-ind' : (C : ∀ {n M T} → red-cand {n} M T → Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a))
+                   → C {T = atm a} (rc-atm {a = a} nrm))
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S))
+                   → (∀ {N} s → C {n} {N} {T} s → C {T = S} (fnc s))
+                     → C {T = T ⇒ S} (rc-⇒ fnc))
+                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
+  rc-ind' C Catm Cfnc {T = atm a} = Catm {a = a}
+  rc-ind' C Catm Cfnc {n} {M} {T = T ⇒ S} fnc = Cfnc fnc {!!}
+    where aux : {N : Trm n} → (fnc : red-cand {n} M (T ⇒ S))
+                   → (s : red-cand N T) → C s → C (fnc s)
+          aux {N} fnc s = {!!}
+          -- C Catm Cfnc (fnc s)
+-}                
 
 
 {-
@@ -473,22 +514,34 @@ module simpleTT (A : Set) where
     -- there should be red-cand {n} N T instead of the typing judgemen
 -}
 
---   data is-neutral {n} : Trm n → Set where
---     neu-var : ∀ {i} → is-neutral (var i)
---     neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
+  data is-neutral {n} : Trm n → Set where
+    neu-var : ∀ {i} → is-neutral (var i)
+    neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
 
---   red-cand-Props : Ty → ∀ {n} → Trm n → Set
---   red-cand-Props T M = (red-cand M T → isStrNrm M)
---                        × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T) -- trivial from above?
---                        × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
+  red-cand-Props : ∀ {n} → Trm n → Ty → Set
+  red-cand-Props M T = (red-cand M T → isStrNrm M)
+                       × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T)
+                       × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
 
---   red-cand-props : ∀ T {n} M → red-cand-Props T {n} M
---   red-cand-props (atm a) M =
---     rc-atm-inv
---     , (λ rc stp → rc-atm (strnrm-⟶ (rc-atm-inv rc) stp))
---     , {!!}
---     where rc-atm-inv : red-cand M (atm a) → isStrNrm M
---           rc-atm-inv (rc-atm nrm) = nrm
---   red-cand-props (T ⇒ S) M = {!!}
+  strnrm-is-redcand : ∀ {n} M → isStrNrm {n} M → ∀ T → red-cand M T
+  strnrm-is-redcand M nrmM (atm a) = nrmM
+  strnrm-is-redcand M nrmM (T ⇒ S) = {!!}
+
+  red-cand-props : ∀ {n} M T → red-cand-Props {n} M T
+
+  red-cand-props {n} M (atm a) =
+      id
+    , (λ nrm {N} → strnrm-⟶ {N = N} nrm)
+    , λ _ → strnrm-stp-any {n} {M}
+
+  red-cand-props {n} M (T ⇒ S) =
+      (λ fnc → {!!})
+    , {!!}
+    , {!!}
+    where nrmaux : ∀ {N} → red-cand (app M N) S → isStrNrm (app M N)
+          nrmaux {N} = prj1 (red-cand-props (app M N) S)
+          appnrm : (fnc : ∀ {N} → red-cand N T → red-cand (app M N) S)
+                        → ∀ {N} → isStrNrm N → isStrNrm (app M N)
+          appnrm fnc {N} = nrmaux {N} ∘ fnc {N} ∘ {!!}
   
--- -- end file
+-- end file

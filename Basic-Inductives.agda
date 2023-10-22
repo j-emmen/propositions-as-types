@@ -142,6 +142,10 @@ module Basic-Inductives where
   dec→¬¬e (inl a) = λ _ → a
   dec→¬¬e (inr na) = λ f → N₀ind (f na)
 
+  ¬Σ→Π¬ : ∀ {A} {B : A → Set} → ¬ (Σ[ A ] B) → ∀ a → ¬ (B a)
+  ¬Σ→Π¬ ne = λ a → ne ∘ a ,,_
+  Π¬→¬Σ : ∀ {A} {B : A → Set} → (∀ a → ¬ (B a)) → ¬ (Σ[ A ] B)
+  Π¬→¬Σ an = λ z → an (pj1 z) (pj2 z)
 
   -------------------------------------------------------------
   -- The reflexive and transitive closure of a binary relation

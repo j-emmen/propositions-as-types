@@ -1,3 +1,4 @@
+{-# OPTIONS --without-K #-}
 
 module Nat-and-Fin where
   open import Identity public
@@ -119,11 +120,14 @@ module Nat-and-Fin where
 
   =2≤N : ∀ {n m} → n == m → n ≤N m
   =2≤N {n} eq = =transp (n ≤N_) eq (≤N-rfl {n})
-  =≤N : ∀ {n n' m} → n == n' → n' ≤N m → n ≤N m
-  =≤N {m = m} eq = =transp (_≤N m) (eq ⁻¹)
+  =≤N : ∀ {n n' m} → n == n' → n ≤N m → n' ≤N m
+  =≤N {m = m} eq = =transp (_≤N m) eq
   ≤N= : ∀ {n m m'} → n ≤N m → m == m' → n ≤N m'
   ≤N= {n} dq eq = =transp (n ≤N_) eq dq
-  
+  =≤N' : ∀ {n n' m} → n == n' → n' ≤N m → n ≤N m
+  =≤N' {m = m} eq = =transp (_≤N m) (eq ⁻¹)
+  ≤N=' : ∀ {n m m'} → n ≤N m' → m == m' → n ≤N m
+  ≤N=' {n} dq eq = =transp (n ≤N_) (eq ⁻¹) dq
     
   ≤N-trn : ∀ {n m l} → n ≤N m → m ≤N l → n ≤N l
   ≤N-trn {zero} dq₁ dq₂ = 0₁
@@ -187,8 +191,14 @@ module Nat-and-Fin where
   Fin-=to→ : ∀ {n m} → n == m → Fin n → Fin m
   Fin-=to→ {n} {m} p = =transp Fin p
 
-  Fin-=to→-inv : ∀ {n m} → (p : n == m) → is-invrt (Fin-=to→ {n} {m} p)
-  Fin-=to→-inv = =transp-is-invrt Fin
+  Fin-=to→-invrt : ∀ {n m} → (p : n == m) → is-invrt (Fin-=to→ {n} {m} p)
+  Fin-=to→-invrt = =transp-is-invrt Fin
+
+  Fin-inhab-is-suc : ∀ {n} → Fin n → Σ[ Nat ] (λ x → suc x == n)
+  Fin-inhab-is-suc {zero} = N₀ind
+  Fin-inhab-is-suc {suc n} = λ _ → n ,, =rf
+  Fin-suc-is-inhab : ∀ {n m} → suc m == n → Fin n
+  Fin-suc-is-inhab {n} {m} eq = Fin-=to→ eq fz
 
   Fin+N-fnc : ∀ {n m} {A : Set} → (Fin n → A) → (Fin m → A) → Fin (n +N m) → A
   Fin+N-fnc {zero} lt rt             = rt
@@ -322,16 +332,16 @@ module Nat-and-Fin where
   max≤N-2-EM zero m = inr =rf
   max≤N-2-EM (suc n) zero = inl =rf
   max≤N-2-EM (suc n) (suc m) = [ inl ∘ =ap suc ∣ inr ∘ =ap suc ] (max≤N-2-EM n m)
-  
-  is-max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Fin (suc n) → Set
+
+  is-max≤N-Fin : ∀ {n} → (f : Fin n → Nat) → Fin n → Set
   is-max≤N-Fin f iₘₓ = ∀ i → f i ≤N f iₘₓ
 
-  max≤N-Fin : ∀ {n} → (f : Fin (suc n) → Nat) → Σ[ Fin (suc n) ] (is-max≤N-Fin f)
-  max≤N-Fin {zero} f = fz ,, λ i → =2≤N (=ap f (pj2 (N₁-isContr) i))
-  max≤N-Fin {suc n} f = pj1 iₘₓ ,, i-ismax
+  max≤N-Finsuc : ∀ {n} → (f : Fin (suc n) → Nat) → Σ[ Fin (suc n) ] (is-max≤N-Fin f)
+  max≤N-Finsuc {zero} f = fz ,, λ i → =2≤N (=ap f (pj2 (N₁-isContr) i))
+  max≤N-Finsuc {suc n} f = pj1 iₘₓ ,, i-ismax
     where mxffs : Σ[ Fin (suc n) ] (is-max≤N-Fin (f ∘ fs))
-          mxffs = max≤N-Fin (f ∘ fs)
-          mxN : Σ[ Nat ] (is-maxN-2 (f (fs (pj1 (max≤N-Fin (f ∘ fs))))) (f fz))
+          mxffs = max≤N-Finsuc (f ∘ fs)
+          mxN : Σ[ Nat ] (is-maxN-2 (f (fs (pj1 (max≤N-Finsuc (f ∘ fs))))) (f fz))
           mxN = max≤N-2 (f (fs (pj1 mxffs))) (f fz)
           iₘₓ : Σ[ Fin (suc (suc n)) ] (λ x → f x == pj1 mxN)
           iₘₓ = [ f₁ ∣ f₂ ] (max≤N-2-EM (f (fs (pj1 mxffs))) (f fz))
@@ -347,13 +357,10 @@ module Nat-and-Fin where
                                   (pj2 mxffs i) (≤N= {f (fs (pj1 mxffs))} {pj1 mxN} (prj1 (pj2 mxN))
                                                                                     (pj2 iₘₓ ⁻¹))
 
-  is-max≤N-Fin-ext : ∀ {n} → (f : Fin n → Nat) → Fin n → Set
-  is-max≤N-Fin-ext f iₘₓ = ∀ i → f i ≤N f iₘₓ
-
-  max≤N-Fin-ext : ∀ {n} → (f : Fin n → Nat)
-                    → (Fin n → N₀) + Σ[ Fin n ] (is-max≤N-Fin-ext f)
-  max≤N-Fin-ext {zero} f = inl id
-  max≤N-Fin-ext {suc n} f = inr (max≤N-Fin f)
+  max≤N-Fin : ∀ {n} → (f : Fin n → Nat)
+                    → (Fin n → N₀) + Σ[ Fin n ] (is-max≤N-Fin f)
+  max≤N-Fin {zero} f = inl id
+  max≤N-Fin {suc n} f = inr (max≤N-Finsuc f)
 
 
   is-finite : Set → Set
@@ -363,7 +370,7 @@ module Nat-and-Fin where
   is-finite-bound A = Σ[ Nat ] (λ n → Σ[ ((Fin n → A) × (A → Fin n)) ]
                                           (λ x → ∀ a → prj1 x (prj2 x a) == a))
 
-
+  -- function that misses an element (face map)
   miss-Fin : ∀ {n} → (i : Fin (suc n))
                → Σ[ (Fin n → Fin (suc n)) ] (λ x → ∀ j → i == x j → N₀)
   miss-Fin fz = fs ,, λ j → PA4-Fin {i = j}
