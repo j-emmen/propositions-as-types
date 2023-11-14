@@ -162,6 +162,10 @@ module Nat-and-Fin where
   ≤N-EM (suc n) zero = inr 0₁
   ≤N-EM (suc n) (suc m) = ≤N-EM n m
 
+  ≤N-diff : ∀ {n m} → n ≤N m → Σ[ Nat ] (λ x → x +N n == m)
+  ≤N-diff {zero} {m} leq = m ,, +N-idr m
+  ≤N-diff {suc n} {suc m} leq = pj1 (≤N-diff {n} {m} leq) ,, +N-sucswap _ n • =ap suc (pj2 (≤N-diff {n} leq))
+
 
   -- finite sets
 
@@ -200,10 +204,25 @@ module Nat-and-Fin where
   Fin-suc-is-inhab : ∀ {n m} → suc m == n → Fin n
   Fin-suc-is-inhab {n} {m} eq = Fin-=to→ eq fz
 
-  Fin+N-fnc : ∀ {n m} {A : Set} → (Fin n → A) → (Fin m → A) → Fin (n +N m) → A
+  Fin-diag : ∀ {n} → Fin (suc (suc n)) → Fin (suc n)
+  Fin-diag fz = fz
+  Fin-diag (fs i) = i
+
+  Fin-+Nto→  : ∀ k {n} → Fin n → Fin (k +N n)
+  Fin-+Nto→ zero = id
+  Fin-+Nto→ (suc k) = fs ∘ Fin-+Nto→ k
+  Fin-≤to→ : ∀ {n m} → n ≤N m → Fin n → Fin m
+  Fin-≤to→ {n} {m} leq = Fin-=to→ eq ∘ Fin-+Nto→ k
+    where k : Nat
+          k = pj1 (≤N-diff {n} leq)
+          eq : k +N n == m
+          eq = pj2 (≤N-diff {n} leq)
+
+  Fin[_∣_]_ Fin+N-fnc : ∀ {n m} {A : Set} → (Fin n → A) → (Fin m → A) → Fin (n +N m) → A
   Fin+N-fnc {zero} lt rt             = rt
   Fin+N-fnc {suc n} lt rt fz         = lt fz
   Fin+N-fnc {suc n} lt rt (fs i)     = Fin+N-fnc (lt ∘ fs) rt i
+  Fin[_∣_]_ = Fin+N-fnc
 
   Fin+N-inl : ∀ {n m} → Fin n → Fin (n +N m)
   Fin+N-inl {zero} = N₀ind
@@ -409,6 +428,9 @@ module Nat-and-Fin where
   -- listFin f = [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
 
   -- some properties of it
+  liftFin-id : ∀ {n f} → (∀ i → f i == i) → ∀ i → liftFin {n} f i == i
+  liftFin-id isid fz = =rf
+  liftFin-id isid  (fs i) = =ap fs (isid i)
   liftFin-ptw : {n m : Nat}{f f' : Fin n → Fin m}
                    → (∀ i → f i == f' i) → ∀ i → liftFin f i == liftFin f' i
   liftFin-ptw {f = f} {f'} pf fz = =rf {a = fz}
@@ -429,5 +451,10 @@ module Nat-and-Fin where
                    → ∀ i → liftFin g' (liftFin f i) == liftFin f' (liftFin g i)
   liftFin-sq pf fz = =rf
   liftFin-sq pf (fs i) = =ap fs (pf i)
+
+  liftFin-inj : ∀ {n m} {f : Fin n → Fin m} (finj : ∀ {x x'} → f x == f x' → x == x')
+                  → ∀ {x x'} → liftFin f x == liftFin f x' → x == x'
+  liftFin-inj finj {fz} {fz} eq = =rf
+  liftFin-inj finj {fs x} {fs x'} eq = =ap fs (finj (fs-inj eq))
 
 -- end of file

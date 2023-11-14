@@ -56,6 +56,14 @@ module simpleTT (A : Set) where
   ⊢-app-premᵣ : ∀ {Γ S M N} → (der : Γ ⊢ app M N ∶ S) → Γ ⊢ N ∶ (⊢-app-premₜ der)
   ⊢-app-premᵣ der = prj2 (pj2 (⊢-app-prem der))
 
+  -- some useful properties of derivations
+  ⊢∶-= : ∀ {Γ T M M'} → M == M' → Γ ⊢ M ∶ T → Γ ⊢ M' ∶ T
+  ⊢∶-= {Γ} {T} = =transp (λ x → Γ ⊢ x ∶ T)
+  ⊢v∶-∋∶ : ∀ {Γ T i} → Γ ⊢ var i ∶ T → Γ ∋ i ∶ T
+  ⊢v∶-∋∶ (⊢-var inc) = inc
+  ⊢∶-∋∶ : ∀ {Γ T M} → Γ ⊢ M ∶ T → ∀ {i} → M == var i → Γ ∋ i ∶ T
+  ⊢∶-∋∶ der eq = ⊢v∶-∋∶ (⊢∶-= eq der)
+
   -- projections of variables, possibly rearranging occurences of types in contexts
   infix 10 _◂_∶_
   data _◂_∶_ : (Γ' Γ : Ctx) → (Fin (len Γ') → Fin (len Γ)) → Set where
@@ -99,6 +107,7 @@ module simpleTT (A : Set) where
   π-! {[]} p = π-∅
   π-! {R ∣ Γ} p = π-frg {p = N₀ind} R N₀ind (π-! {Γ} _)
 
+{-
   -- projections are closed under composition
   -- (does not seem to be needed, perhaps because we work pointwise)
   π-cmp : ∀ {Γ Δ Θ p q r} → q ∘ p == r
@@ -107,14 +116,13 @@ module simpleTT (A : Set) where
   π-cmp eq (π-frg R eqs πp) πq = {!!}
   π-cmp eq (π-cnc R eqz eqs πp) πq = {!!}
   π-cmp eq (π-swp R S eqz eqsz eqss πp) πq = {!!}
+-}
 
   -- projections forget variables
   π-≤ : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → len Γ' ≤N len Γ
   π-≤ π-∅                              = 0₁
   π-≤  {Γ'} {R ∣ Γ} (π-frg R eq πp)     = suc-≤ {len Γ'} {len Γ} (π-≤ πp)
-  -- the expression
-  -- suc-≤ (len Γ') (len Γ) (π-≤ πp)
-  -- would compile. Why?
+  -- the expression `suc-≤ (len Γ') (len Γ) (π-≤ πp)` compiles. Why?
   π-≤ (π-cnc R eqz eqs πp)             = π-≤ πp
   π-≤ (π-swp R S eqz eqsz eqss πp)     = π-≤ πp
 
@@ -175,14 +183,15 @@ module simpleTT (A : Set) where
 
   swap-first : ∀ {n} → Fin (suc (suc n)) → Fin (suc (suc n))
   swap-first fz = fs fz
-  swap-first (fs fz) = fz
-  swap-first (fs (fs i)) = fs (fs i)
+  swap-first (fs i) = liftFin fs i
 
-  -- the restriction of swap-first to Fin (suc n) via fs is liftFin fs
-  -- (i.e. the inclusion of Fin (suc n) which misses fs fz)
-  liftFinfs=swap-first∘fs : ∀ {n} → (i : Fin (suc n)) → liftFin {n} fs i == swap-first (fs i)
-  liftFinfs=swap-first∘fs fz = =rf
-  liftFinfs=swap-first∘fs (fs i) = =rf
+  ≡∶-same-len : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → len Γ' == len Γ
+  ≡∶-same-len {[]} {[]} {f} ∅ =
+    =rf
+  ≡∶-same-len {(R ∣ Γ')} {(R ∣ Γ)} {f} (≡∶cnc R eqz eqs bij) =
+    =ap suc (≡∶-same-len bij)
+  ≡∶-same-len {(R ∣ S ∣ Γ')} {(S ∣ R ∣ Γ)} {f} (≡∶swp R S eqz eqsz eqss bij) =
+    =ap (suc ∘ suc) (≡∶-same-len bij)
 
   -- the bijections are the projections between contexts of the same length
   ≡∶to◂∶ : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → Γ' ◂ Γ ∶ f
@@ -233,13 +242,10 @@ module simpleTT (A : Set) where
   ≡∶-congr-⊢ bij (⊢-abs {T = T} der) = ⊢-abs (≡∶-congr-⊢ (≡∶cnc T =rf (λ _ → =rf) bij) der)
   ≡∶-congr-⊢ bij (⊢-app der₁ der₂) = ⊢-app (≡∶-congr-⊢ bij der₁) (≡∶-congr-⊢ bij der₂)
 
-  -- some useful properties of derivations
-  ⊢∶-= : ∀ {Γ T M M'} → M == M' → Γ ⊢ M ∶ T → Γ ⊢ M' ∶ T
-  ⊢∶-= {Γ} {T} = =transp (λ x → Γ ⊢ x ∶ T)
-  ⊢v∶-∋∶ : ∀ {Γ T i} → Γ ⊢ var i ∶ T → Γ ∋ i ∶ T
-  ⊢v∶-∋∶ (⊢-var inc) = inc
-  ⊢∶-∋∶ : ∀ {Γ T M} → Γ ⊢ M ∶ T → ∀ {i} → M == var i → Γ ∋ i ∶ T
-  ⊢∶-∋∶ (⊢-var inc) eq = ⊢v∶-∋∶ (⊢∶-= eq (⊢-var inc))
+  ≡∶-occur : ∀ {Γ T i} → Γ ∋ i ∶ T
+               → Σ[ Ctx ] (λ x →
+                   Σ[ (Fin (suc (len x)) → Fin (len Γ)) ] ((T ∣ x) ≡ Γ ∶_))
+  ≡∶-occur {Γ} {T} {i} pf = {!!}
 
   -- three useful properties of projections
   π-= : ∀ {Γ Γ' p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
@@ -269,7 +275,7 @@ module simpleTT (A : Set) where
   π-∋∶ (π-swp R S eqz eqsz eqss πp) {fs (fs i)} (there (there inc)) =
     ∋v∶-= (eqss i) (there (there (π-∋∶ πp inc)))
 
-
+  -- used only to prove `←to◂`, which is not used anywhere
   π-∋∶-inv : ∀ {Γ Γ' p} → (∀ {i j} → p i == p j → i == j)
                → (∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T) → Γ' ◂ Γ ∶ p
   π-∋∶-inv {[]} {[]} inj pf =
@@ -280,16 +286,29 @@ module simpleTT (A : Set) where
                     (λ {x} {_} → N₀ind {λ _ → ([] ∋ x ∶ _ → Γ ∋ N₀ind x ∶ _)} x))
   π-∋∶-inv {[]} {R' ∣ Γ'} {p} inj pf =
     N₀ind {λ _ → R' ∣ Γ' ◂ [] ∶ p} (p fz)
-  π-∋∶-inv {R ∣ Γ} {R' ∣ Γ'} {p} inj pf = {!π-∋∶-inv ? pf'!}
-    where pf' : ∀ {i T} → Γ' ∋ i ∶ T → R ∣ Γ ∋ (p (fs i)) ∶ T
-          pf' inc = pf (there inc)
-          -- need to define p' : Fin (len Γ') → Fin (suc (len Γ'))
-          -- s.t. p' i = p (fs i)
-          p₀ : Fin (len Γ') → Fin (len Γ)
-          p₀ i = {!p (fs i)!}
+  π-∋∶-inv {R ∣ Γ} {R' ∣ Γ'} {p} inj pf = {!!}
+    where -- note that `p fz` is an occurrence of `R'` in `R ∣ Γ` by `pf`, that is
+          Θ : Ctx
+          Θ = pj1 (≡∶-occur (pf here))
+          f : Fin (suc (len Θ)) → Fin (suc (len Γ))
+          f = pj1 (pj2 (≡∶-occur (pf here)))
+          fbij : (R' ∣ Θ) ≡ (R ∣ Γ) ∶ f
+          fbij = pj2 (pj2 (≡∶-occur (pf here)))
+          lΘ : len Θ == len Γ
+          lΘ = suc-inj (≡∶-same-len fbij)
+          -- then `p (fs i)` is in `Θ` for every `i`, that is
+          p₀ : Fin (len Γ') → Fin (len Θ)
+          p₀ = {!!}
+          eq₀ : ∀ {i} → fs (Fin-=to→ lΘ (p₀ i)) == p (fs i)
+          eq₀ = {!!}
+          pp₀ : Γ' ◂ Θ ∶ p₀
+          pp₀ = {!!}
 
 
+  ---------------------------
   -- weakening is admissible
+  ---------------------------
+  
   wkn-π : ∀ {Γ Γ' p M T} → Γ' ◂ Γ ∶ p → Γ' ⊢ M ∶ T → Γ ⊢ rename M p ∶ T
   wkn-π πp (⊢-var inc) = ⊢-var (π-∋∶ πp inc)
   wkn-π πp (⊢-abs {T = T} der) = ⊢-abs (wkn-π (π-cnc T =rf (λ _ → =rf) πp) der)
@@ -381,23 +400,22 @@ module simpleTT (A : Set) where
           aux {fz} {T} here = ⊢∶-∋∶ der (eqz • eq fz ⁻¹)
           aux {fs i} {T} (there inc) = ⊢∶-∋∶ (σ-∋∶ σs inc) (eqs i • eq (fs i) ⁻¹)
 
-  -- the substitution var ∘ pr₁₁ where (pr₁₁ : 0₂, 1₂ ⊢> 0₁), should NOT be a projection
+  -- the substitution var ∘ pr₁₁ where (pr₁₁ : 0₂, 1₂ ⊢> 0₁)
   pr₁₁ : Fin two → Fin one
-  pr₁₁ i = fz
+  pr₁₁ = Fin-diag {zero}
   σdiag : ∀ {T s} → (∀ i → var fz == s i) → (T ∣ T ∣ []) ← (T ∣ []) ∶ s
   σdiag {T} {s} eqv = σ-trm (eqv fz) aux σ-id (⊢-var here)
     where aux : (i : Fin one) → var i == s (fs i)
           aux fz = eqv (fs fz)
-  σdiag-π : ∀ {T} → (T ∣ T ∣ []) ◂ (T ∣ []) ∶ pr₁₁
-  σdiag-π = ←to◂ {!!} (λ _ → =rf) (σdiag λ _ → =rf)
-  -- luckily goal ?5 seems to be false
 
   -- term sections are substitutions
   σ-trmsect : ∀ {Γ T M} → Γ ⊢ M ∶ T → T ∣ Γ ← Γ ∶ trmsect M
   σ-trmsect der = σ-trm =rf (λ _ → =rf) σ-id der
 
-
+  ------------------------------
   -- substitution is admissible
+  ------------------------------
+
   σ-subst-all : ∀ {Γ Γ' s T M} → Γ ← Γ' ∶ s → Γ ⊢ M ∶ T → Γ' ⊢ subst-all M s ∶ T
   σ-subst-all σs (⊢-var inc) = σ-∋∶ σs inc
   σ-subst-all σs (⊢-abs der) = ⊢-abs (σ-subst-all (σ-wlift _ (λ _ → =rf) σs) der)
@@ -421,14 +439,18 @@ module simpleTT (A : Set) where
     ⊢-app der₁ (subj-red stp der₂)
   -- light grey indicates that the clauses do NOT hold definitionally
 
-
+  -----------------------------
   -- lam M is a canonical form
+  -----------------------------
+  
   lam-is-canf : ∀ {Γ T S M} → Γ ⊢ M ∶ T ⇒ S → is-value M
                   → Σ[ Trm (suc (len Γ)) ] (λ x → lam x == M)
   lam-is-canf der (val-lam {M'} nrm') = M' ,, =rf
 
-
+  ------------
   -- progress
+  ------------
+  
   progr : ∀ {T M} → [] ⊢ M ∶ T → is-normal M → is-value M
   progr (⊢-abs der) nrm = val-lam (nrm-lam nrm)
   progr {T} (⊢-app {M = M} {N} der₁ der₂) nrm = N₀ind (nrm (subst-0 M' N) stp')
@@ -441,24 +463,29 @@ module simpleTT (A : Set) where
           stp' : app M N ⟶ subst-0 M' N
           stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
 
-
+  ---------------------------
   -- reducibility candidates
+  ---------------------------
 {-
-  -- it seems that the straightforward inductive definition of `red-cand` 
-  -- is NOT strictly positive
+  -- the straightforward inductive definition of `red-cand` is NOT strictly positive
   data red-cand {n} (M : Trm n) : (T : Ty) → Set where
     rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
     rc-⇒ : ∀ {T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S)
                    → red-cand M (T ⇒ S)
 -}
-
-  -- so define it by induction into the universe `Set`
+  -- so define it by recursion into `Set`
   red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
   red-cand {n} M (atm a) = isStrNrm M
-  red-cand {n} M (T ⇒ S) = ∀ {N} → red-cand N T → red-cand (app M N) S
+  red-cand {n} M (T ⇒ S) = ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
+  -- the second clause quantifies over all `k` and `N : Trm (k +N n)`
+  -- as I am not able to prove that red-cand is invariant under weakening otherwise.
+--red-cand {n} M (T ⇒ S) = ∀ {N} → red-cand N T → red-cand (app M N) S
+
+  -- quite useless functions
   rc-atm : ∀ {n M} {a : A} → isStrNrm {n} M → red-cand M (atm a)
   rc-atm nrm = nrm
-  rc-⇒ : ∀ {n M T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S) → red-cand M (T ⇒ S)
+  rc-⇒ : ∀ {n M T S} → (∀ k {N} → red-cand N T → red-cand (app (ext[ k ] {n} M) N) S)
+              → red-cand M (T ⇒ S)
   rc-⇒ rcapp = rcapp
   rc-ind : (C : ∀ {n M T} → red-cand {n} M T → Set)
               → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C (rc-atm {a = a} nrm))
@@ -472,60 +499,41 @@ module simpleTT (A : Set) where
                 → ∀ {n M T} → (rc : red-cand {n} M T) → C
   rc-rec C = rc-ind (λ _ → C)
 
-{-
-  rc-ind-aux : (C : ∀ {n M T} → red-cand {n} M T → Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a))
-                   → C {T = atm a} (rc-atm {a = a} nrm))
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S))
-                   → (∀ {N} s → C {n} {N} {T} s → C {T = S} (fnc s))
-                     → C {T = T ⇒ S} (rc-⇒ fnc))
-                → ∀ {n M T S} → (fnc : ∀ {N} → red-cand {n} N T → red-cand (app M N) S)
-                  → ∀ {N} (rc : red-cand {n} N T) → C rc → C (fnc rc)
-  rc-ind-aux C Catm Cfnc fnc rc = rc-ind Fam {!!} {!!} rc fnc 
-    where Fam : ∀ {n N T} → red-cand {n} N T → Set
-          Fam {n} {N} {T}  rc =
-              ∀ {M S} → (fnc : ∀ {P} → red-cand {n} P T → red-cand (app M P) S)
-                        → C rc → C (fnc rc)
 
-  rc-ind' : (C : ∀ {n M T} → red-cand {n} M T → Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a))
-                   → C {T = atm a} (rc-atm {a = a} nrm))
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S))
-                   → (∀ {N} s → C {n} {N} {T} s → C {T = S} (fnc s))
-                     → C {T = T ⇒ S} (rc-⇒ fnc))
-                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
-  rc-ind' C Catm Cfnc {T = atm a} = Catm {a = a}
-  rc-ind' C Catm Cfnc {n} {M} {T = T ⇒ S} fnc = Cfnc fnc {!!}
-    where aux : {N : Trm n} → (fnc : red-cand {n} M (T ⇒ S))
-                   → (s : red-cand N T) → C s → C (fnc s)
-          aux {N} fnc s = {!!}
-          -- C Catm Cfnc (fnc s)
--}                
-
-
-{-
-  data red-cand {n} (M : Trm n) : (T : Ty) → Set where
-    rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
-    rc-⇒ : ∀ {T S} → (∀ {N} -- → (f : Fin n → Ty)
-             → red-cand {n} N T --pj1 (fnc2Ctx f) ⊢ =transp Trm (pj2 (fnc2Ctx f)) N ∶ T
-             → red-cand (app M N) S)
-                → red-cand M (T ⇒ S)
-    -- not the right definition:
-    -- there should be red-cand {n} N T instead of the typing judgemen
--}
-
+  ------------------
+  -- neutral terms
+  ------------------
+  
   data is-neutral {n} : Trm n → Set where
-    neu-var : ∀ {i} → is-neutral (var i)
-    neu-app : ∀ {M N} → is-neutral M → is-neutral N → is-neutral (app M N)
+    ntr-var : ∀ {i} → is-neutral (var i)
+    ntr-app : ∀ {M N} → is-neutral M → is-neutral (app M N)
 
+  var-is-neutral : ∀ {n M} → Trm-is-var {n} M → is-neutral M
+  var-is-neutral {n} {M} Mvar = (is-neutral ● (pj2 Mvar)) (ntr-var {i = pj1 Mvar})
+  neutral-is-app+var : ∀ {n M} → is-neutral {n} M → Trm-is-var M + Trm-is-app M
+  neutral-is-app+var (ntr-var {i = i}) = inl (i ,, =rf) 
+  neutral-is-app+var (ntr-app {M₁} {M₂} _) = inr ((M₁ , M₂) ,, =rf)
+  -- and M and N are app+var as well, and so on
+  neutral≠lam : ∀ {n M} → is-neutral M → ¬ (Σ[ Trm (suc n) ] (λ x → lam x == M))
+  neutral≠lam ntr-var islam = lam≠var _ (pj1 islam) (pj2 islam)
+  neutral≠lam (ntr-app ntr) islam = lam≠app (pj1 islam) _ _ (pj2 islam)
+  neutral-rename : ∀ {n m} (f : Fin n → Fin m) {M}
+                        → is-neutral M → is-neutral (rename M f)
+  neutral-rename f {var _} ntr-var = ntr-var
+  neutral-rename f {app _ _} (ntr-app Mntr) = ntr-app (neutral-rename f Mntr)
+  neutral-ext : ∀ {n M} → is-neutral {n} M → is-neutral (ext M)
+  neutral-ext = neutral-rename fs
+  neutral-extk : ∀ k {n M} → is-neutral {n} M → is-neutral (ext[ k ] M)
+  neutral-extk zero = id
+  neutral-extk (suc k) = neutral-ext ∘ neutral-extk k
+
+
+  -- the three main properties of reducibility candidates
+  
   red-cand-Props : ∀ {n} → Trm n → Ty → Set
   red-cand-Props M T = (red-cand M T → isStrNrm M)
                        × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T)
                        × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
-
-  strnrm-is-redcand : ∀ {n} M → isStrNrm {n} M → ∀ T → red-cand M T
-  strnrm-is-redcand M nrmM (atm a) = nrmM
-  strnrm-is-redcand M nrmM (T ⇒ S) = {!!}
 
   red-cand-props : ∀ {n} M T → red-cand-Props {n} M T
 
@@ -535,13 +543,80 @@ module simpleTT (A : Set) where
     , λ _ → strnrm-stp-any {n} {M}
 
   red-cand-props {n} M (T ⇒ S) =
-      (λ fnc → {!!})
-    , {!!}
-    , {!!}
+    CR1
+    , CR2
+    , CR3
     where nrmaux : ∀ {N} → red-cand (app M N) S → isStrNrm (app M N)
-          nrmaux {N} = prj1 (red-cand-props (app M N) S)
-          appnrm : (fnc : ∀ {N} → red-cand N T → red-cand (app M N) S)
-                        → ∀ {N} → isStrNrm N → isStrNrm (app M N)
-          appnrm fnc {N} = nrmaux {N} ∘ fnc {N} ∘ {!!}
-  
+          nrmaux {N} = prj1 (red-cand-props (app M N) S)          
+          strnrmₗₑᵥ-appvar : ∀ {k} → isStrNrmₗₑᵥ k (app (ext M) (var fz)) → isStrNrmₗₑᵥ k M
+          strnrmₗₑᵥ-appvar snw = strnrmₗₑᵥ-ext (strnrmₗₑᵥ-appₗ snw)
+          strnrm-appvar : isStrNrm (app (ext M) (var fz)) → isStrNrm M
+          strnrm-appvar snw = pj1 snw ,, strnrmₗₑᵥ-appvar (pj2 snw)
+          varz-red-cand : ∀ {n} i → red-cand (var {n} i) T
+          varz-red-cand i = prj2 (prj2 (red-cand-props (var i) T)) ntr-var (λ s → N₀ind (nrm-var _ s))
+          CR1 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
+                      → isStrNrm M
+          CR1 fnc = strnrm-appvar (prj1 (red-cand-props (app (ext M) (var fz)) S)
+                                        (fnc one (varz-red-cand fz)))
+
+          CR2 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
+                     → {M' : Trm n} → M ⟶ M'
+                       → ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M') N) S
+          CR2 fnc {M'} stp k {N} rc = prj1 (prj2 (red-cand-props (app (ext[ k ] M) N) S)) (fnc k rc) (βappₗ (⟶-extk k stp))
+
+          -- use the fact that a reduction `app M N ⟶ P` is either `β`, `βappₗ`, or `βappᵣ`,
+          -- and it cannot be `β` when `M` is neutral
+          Mβapp-inv : ∀ k N → is-invrt (βapp-stp {k +N n} {ext[ k ] M} {N})
+          Mβapp-inv k N = eqv-is-invrt (βapp-eqv {k +N n} {ext[ k ] M} {N})
+          CR3-auxₗ : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+                      → ∀ k {N} → red-cand N T
+                      → (MM : Σ[ Trm (k +N n) ] _⟶_ (ext[ k ] M))
+                        → red-cand (app (pj1 MM) N) S
+          CR3-auxₗ Mntr fnc k {N} rc MM =
+            =transp (λ x → red-cand x S)
+                    (=ap (λ x → app x N) (prj1 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))))
+                    (fnc (prj2 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))) k rc)
+{-
+          CR3-auxᵣ : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+                      → ∀ l k {N} → isStrNrmₗₑᵥ l N → red-cand N T
+                      → (NN : Σ[ Trm (k +N n) ] (N ⟶_))
+                        → red-cand (app (ext[ k ] M) (pj1 NN)) S
+          CR3-auxᵣ Mntr fnc zero k (strnrm-nrm Nnrm) Nrc NN =
+            N₀ind (Nnrm (pj1 NN) (pj2 NN))
+          CR3-auxᵣ Mntr fnc (suc l) k (strnrm-stp Nsns) Nrc NN = {!!}
+-}
+
+          CR3-aux : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+                    → ∀ {l} k {N} → isStrNrmₗₑᵥ l N → red-cand N T
+                      → ∀ {P} → app (ext[ k ] M) N ⟶ P → red-cand P S
+          CR3-aux Mntr fnc {zero} k {N} (strnrm-nrm Nnrm) Nrc {P} stp =
+            ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
+              (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
+                     (λ islam → N₀ind (neutral≠lam (neutral-extk k Mntr) islam))
+                     (CR3-auxₗ Mntr fnc k Nrc)
+                     (λ NN → N₀ind (Nnrm (pj1 NN) (pj2 NN)))
+                     (pj1 (Mβapp-inv k N) (P ,, stp)))
+          CR3-aux Mntr fnc {suc l} k {N} (strnrm-stp Nsns) Nrc {P} stp =
+            ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
+              (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
+                     (λ islam → N₀ind (neutral≠lam (neutral-extk k Mntr) islam))
+                     (CR3-auxₗ Mntr fnc k Nrc)
+                     (λ NN → prj2 (prj2 (red-cand-props (app (ext[ k ] M) (pj1 NN)) S))
+                                (ntr-app (neutral-extk k Mntr))
+                     -- because of this recursive call...
+                                (CR3-aux Mntr fnc {l} k (Nsns (pj2 NN))
+                                              (prj1 (prj2 (red-cand-props N T))
+                                                 Nrc (pj2 NN))) )
+                     -- ...it seems hard to do induction only on the right-hand side
+                     (pj1 (Mβapp-inv k N) (P ,, stp)))
+
+          CR3 : is-neutral M
+                  → (∀ {M'} (stp : M ⟶ M') → red-cand M' (T ⇒ S))
+                    → ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
+          CR3 Mntr fnc k {N} Nrc =
+            prj2 (prj2 (red-cand-props (app (ext[ k ] M) N) S))
+                 (ntr-app (neutral-extk k Mntr))
+                 (CR3-aux Mntr fnc k (pj2 (prj1 (red-cand-props N T) Nrc)) Nrc)
+  -- end red-cand-props
+
 -- end file

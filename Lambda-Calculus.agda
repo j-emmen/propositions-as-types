@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K #-}
+{-# OPTIONS --without-K --allow-unsolved-metas #-}
 
 module Lambda-Calculus where
   open import Nat-and-Fin
@@ -158,6 +158,9 @@ module Lambda-Calculus where
   ext : ∀ {n} → Trm n → Trm (suc n)
   ext M = rename M fs
   -- maps M(1,...,n) to M(2,...,n+1)
+  ext[_] : ∀ k {n} → Trm n → Trm (k +N n)
+  ext[ zero ] = id
+  ext[ suc k ] = ext ∘ ext[ k ]
 
   wlift : ∀ {n m} → (Fin n → Trm m) → Fin (suc n) → Trm (suc m)
   wlift f fz = var fz
@@ -179,14 +182,30 @@ module Lambda-Calculus where
   wlift-cmp⁻¹ f g i = wlift-cmp f g i ⁻¹
 
 
-  -- renaming is action
-  rename-ptw :  {n m : Nat}(M : Trm n){f f' : Fin n → Fin m}
-                   → (∀ i → f i == f' i)
+  -- renaming is action  
+  rename-id : ∀ {n} M {f} → (∀ i → f i == i) → rename {n} M f == M
+  rename-id (var i) isid =
+    =ap var (isid i)
+  rename-id (lam M) isid =
+    =ap lam (rename-id M (liftFin-id isid))
+  rename-id (app M₁ M₂) isid =
+    =ap₂ app (rename-id M₁ isid) (rename-id M₂ isid)
+  rename-ptw :  {n m : Nat}(M : Trm n){f f' : Fin n → Fin m} → (∀ i → f i == f' i)
                      → rename M f == rename M f'
-  rename-ptw (var x) {f} pf = =ap var (pf x)
-  rename-ptw (lam M) {f} pf = =ap lam (rename-ptw M (liftFin-ptw pf))
-  rename-ptw (app M N) {f} pf = =ap₂ app (rename-ptw M pf) (rename-ptw N pf)
-  
+  rename-ptw (var x) {f} pf =
+    =ap var (pf x)
+  rename-ptw (lam M) {f} pf =
+    =ap lam (rename-ptw M (liftFin-ptw pf))
+  rename-ptw (app M N) {f} pf =
+    =ap₂ app (rename-ptw M pf) (rename-ptw N pf)
+  rename-inj : ∀ {n m} {f : Fin n → Fin m} (finj : ∀ {x x'} → f x == f x' → x == x')
+                  → ∀ {M M'} → rename M f == rename M' f → M == M'
+  rename-inj finj {var i} {var i'} eq =
+    =ap var (finj (var-inj eq))
+  rename-inj finj {lam M} {lam M'} eq =
+    =ap lam (rename-inj (liftFin-inj finj) (lam-inj eq))
+  rename-inj finj {app M₁ M₂} {app M'₁ M'₂} eq =
+    =ap₂ app (rename-inj finj (prj1 (app-inj eq))) (rename-inj finj (prj2 (app-inj eq)))
   rename-act : {n m k : Nat}(M : Trm n)(f : Fin n → Fin m)(g : Fin m → Fin k)
                    → rename (rename M f) g == rename M (g ∘ f)
   rename-act (var x) f g = =rf
@@ -196,6 +215,37 @@ module Lambda-Calculus where
       rename M (liftFin g ∘ liftFin f)           ==[ rename-ptw M (liftFin-cmp f g) ]∎
       rename M (liftFin (g ∘ f)) ∎)
   rename-act (app M₁ M₂) f g = =ap₂ app (rename-act M₁ f g) (rename-act M₂ f g)
+
+  ext-inj : ∀ {n M M'} → ext {n} M == ext M' → M == M'
+  ext-inj = rename-inj fs-inj
+  extk-inj : ∀ k {n M M'} → ext[ k ] {n} M == ext[ k ] M' → M == M'
+  extk-inj zero = id
+  extk-inj (suc k) = extk-inj k ∘ ext-inj
+  
+
+  -- renaming along a variables-projection is the same as iterated extension (weakening)
+  rename-prj-is-ext : ∀ k {n} M → rename {n} M (Fin-+Nto→ k) == ext[ k ] M
+  rename-prj-is-ext zero M = rename-id M (λ _ → =rf)
+  rename-prj-is-ext (suc k) M = rename-act M (Fin-+Nto→ k) fs ⁻¹ • =ap ext (rename-prj-is-ext k M)
+
+  rename-lam-is-lam : ∀ {n m M} (f : Fin n → Fin m) → Trm-is-lam M → Trm-is-lam (rename M f)
+  rename-lam-is-lam f islam =
+    rename (pj1 islam) (liftFin f)
+    ,, =ap (λ x → rename x f) (pj2 islam)
+  ext-lam-is-lam : ∀ {n M} → Trm-is-lam M → Trm-is-lam (ext {n} M)
+  ext-lam-is-lam = rename-lam-is-lam fs
+  rename-lam-is-lam⁻¹ : ∀ {n m M} (f : Fin n → Fin m) → Trm-is-lam (rename M f) → Trm-is-lam M
+  rename-lam-is-lam⁻¹ f islam = {!pj2 islam!}
+  ext-lam-is-lam⁻¹ : ∀ {n M} → Trm-is-lam (ext {n} M) → Trm-is-lam M
+  ext-lam-is-lam⁻¹ {n} {M} (P ,, eq) = {!(Trm-is-lam ● eq)!}
+
+{-
+    rename (pj1 islam) (Fin-diag {n})
+    ,, {!=proof lam (rename (pj1 islam) (Fin-diag {n})) ==[ ? ] /
+               --rename (lam (pj1 islam)) (Fin-diag {n}) ==[ ? ] /
+               rename (ext M) (Fin-diag {n}) ==[ ? ]∎
+               M ∎!}
+-}
 
   rename-sq : {n m : Nat}(M : Trm n){f : Fin n → Fin m}{f' : Fin (suc n) → Fin (suc m)}
               {g : Fin n → Fin (suc n)}{g' : Fin m → Fin (suc m)}
@@ -622,7 +672,7 @@ module Lambda-Calculus where
   βlam-eqv {n} {M} = invrt-is-eqv (βlam-stp-inv ,, βlam-iso {n} {M})
 
   -- A reduction from `app M N` can be `β`, `βappₗ`, or `βappᵣ`
-  -- we proceed by cases on M using propositional euality
+  -- we proceed by cases on M using propositional equality
   -- if we try a direct induction on `M`, Agda complains about termination
 
   βapp-stp : ∀ {n} {M N : Trm n}
@@ -892,6 +942,61 @@ module Lambda-Calculus where
     βappₗ (⟶-rename f redM)
   ⟶-rename f (βappᵣ redM) =
     βappᵣ (⟶-rename f redM)
+  ⟶-rename⁻¹ : ∀ {n m M} (f : Fin n → Fin m) {P} → rename M f ⟶ P
+                 → Σ[ Trm n ] (λ x → (rename x f == P) × M ⟶ x)
+  ⟶-rename⁻¹ {n} {m} {lam M} f {lam P} (βlam stp) =
+    lam (pj1 (⟶-rename⁻¹ (liftFin f) stp))
+    ,, (=ap lam (prj1 (pj2 (⟶-rename⁻¹ (liftFin f) stp)))
+       , βlam (prj2 (pj2 (⟶-rename⁻¹ (liftFin f) stp))))
+  ⟶-rename⁻¹ {n} {m} {app (var i) M₂} f {.(app (var (f i)) _)} (βappᵣ stp) =
+    app (var i) (pj1 (⟶-rename⁻¹ f stp))
+    ,, (=ap (app (var (f i))) (prj1 (pj2 (⟶-rename⁻¹ f stp)))
+       , βappᵣ (prj2 (pj2 (⟶-rename⁻¹ f stp))))
+  ⟶-rename⁻¹ {n} {m} {app (lam M₁) M₂} f {.(subst-all (rename M₁ (liftFin f)) (trmsect (rename M₂ f)))} (β .(rename M₁ (liftFin f)) .(rename M₂ f)) =
+    subst-0 M₁ M₂
+    ,, (subst-0-rename M₁ M₂ f ⁻¹
+       , β M₁ M₂)
+  ⟶-rename⁻¹ {n} {m} {app (lam M₁) M₂} f (βappₗ stp) =
+    app (pj1 (⟶-rename⁻¹ f stp)) M₂
+    ,, (=ap (λ x → app x (rename M₂ f)) (prj1 (pj2 (⟶-rename⁻¹ f stp)))
+       , βappₗ (prj2 (pj2 (⟶-rename⁻¹ f stp))))
+  ⟶-rename⁻¹ {n} {m} {app (lam M₁) M₂} f (βappᵣ stp) =
+    app (lam M₁) (pj1 (⟶-rename⁻¹ f stp))
+    ,, (=ap (app (lam (rename M₁ (liftFin f)))) (prj1 (pj2 (⟶-rename⁻¹ f stp)))
+       , βappᵣ (prj2 (pj2 (⟶-rename⁻¹ f stp))))
+  ⟶-rename⁻¹ {n} {m} {app (app M₁₁ M₁₂) M₂} f (βappₗ stp) =
+    app (pj1 (⟶-rename⁻¹ f stp)) M₂
+    ,, (=ap (λ x → app x (rename M₂ f)) (prj1 (pj2 (⟶-rename⁻¹ f stp)))
+       , βappₗ (prj2 (pj2 (⟶-rename⁻¹ f stp))))
+  ⟶-rename⁻¹ {n} {m} {app (app M₁₁ M₁₂) M₂} f (βappᵣ stp) =
+    app (app M₁₁ M₁₂) (pj1 (⟶-rename⁻¹ f stp))
+    ,, (=ap (app (app (rename M₁₁ f) (rename M₁₂ f))) (prj1 (pj2 (⟶-rename⁻¹ f stp)))
+       , βappᵣ (prj2 (pj2 (⟶-rename⁻¹ f stp))))
+
+  ⟶-ext : ∀ {n M M'} → M ⟶ M' → ext {n} M ⟶ ext M'
+  ⟶-ext = ⟶-rename fs
+  ⟶-extk : ∀ k {n M M'} → M ⟶ M' → ext[ k ] {n} M ⟶ ext[ k ] M'
+  ⟶-extk zero = id
+  ⟶-extk (suc k) = ⟶-ext ∘ ⟶-extk k
+  ⟶-ext⁻¹g : ∀ {n M P} → ext {n} M ⟶ P → Σ[ Trm n ] (λ x → (ext x == P) × M ⟶ x)
+  ⟶-ext⁻¹g stp = ⟶-rename⁻¹ fs stp
+  ⟶-extk⁻¹g : ∀ k {n M P} → ext[ k ] {n} M ⟶ P → Σ[ Trm n ] (λ x → (ext[ k ] x == P) × M ⟶ x)
+  ⟶-extk⁻¹g zero =
+    λ s → _ ,, (=rf , s)
+  ⟶-extk⁻¹g (suc k) {n} {M = M} {P} stp =
+    N ,, (eq , (prj2 (pj2 (⟶-extk⁻¹g k (prj2 (pj2 (⟶-ext⁻¹g stp)))))))
+    where N : Trm n
+          N = pj1 (⟶-extk⁻¹g k (prj2 (pj2 (⟶-ext⁻¹g stp))))
+          eq : ext (ext[ k ] N) == P
+          eq = =ap ext (prj1 (pj2 (⟶-extk⁻¹g k (prj2 (pj2 (⟶-ext⁻¹g stp))))))
+               • prj1 (pj2 (⟶-ext⁻¹g stp)) 
+  ⟶-ext⁻¹ : ∀ {n M M'} → ext {n} M ⟶ ext {n} M' → M ⟶ M'
+  ⟶-ext⁻¹ {n} {M} {M'} stp = ((M ⟶_) ● eq) (prj2 (pj2 (⟶-ext⁻¹g stp)))
+    where eq : pj1 (⟶-ext⁻¹g stp) == M'
+          eq = ext-inj (prj1 (pj2 (⟶-ext⁻¹g stp)))
+  ⟶-extk⁻¹ : ∀ k {n M M'} → ext[ k ] {n} M ⟶ ext[ k ] {n} M' → M ⟶ M'
+  ⟶-extk⁻¹ zero = id
+  ⟶-extk⁻¹ (suc k) = ⟶-extk⁻¹ k ∘ ⟶-ext⁻¹
 
   ⟶-subst-all : {n m : Nat}(f : Fin n → Trm m){M M' : Trm n}
                     → M ⟶ M' → subst-all M f ⟶ subst-all M' f
@@ -1209,6 +1314,8 @@ module Lambda-Calculus where
   data is-value {n : Nat} : Trm n → Set where
     val-lam : ∀ {M} → is-normal M → is-value (lam M)
 
+  nrm-var : ∀ {n i} → is-normal (var {n} i)
+  nrm-var {n} {i} = ¬var⟶ i
   nrm-lam : ∀ {n M} → is-normal {n} (lam M) → is-normal M
   nrm-lam nrm = λ N stp → nrm (lam N) (βlam stp)
   nrm-lam-inv : ∀ {n M} → is-normal {suc n} M → is-normal (lam M)
@@ -1220,6 +1327,11 @@ module Lambda-Calculus where
   nrm-appᵣ nrm = λ N stp → nrm (app _ N) (βappᵣ stp)
   -- the converse holds only iff `M` is not `lam`
 
+  nrm-rename : ∀ {n m} (f : Fin n → Fin m) {M} → is-normal (rename M f) → is-normal M
+  nrm-rename f {M} fMnrm N stp = fMnrm (rename N f) (⟶-rename f stp)
+  nrm-ext : ∀ {n M} → is-normal (ext {n} M) → is-normal M
+  nrm-ext {n} = nrm-rename (fs {n})
+
 
   -- a term is strongly normalising if all its sequences of reductions terminate
   data isStrNrmₗₑᵥ {n : Nat} : Nat → Trm n → Set where
@@ -1228,6 +1340,21 @@ module Lambda-Calculus where
 
   isStrNrm : ∀ {n} → Trm n → Set
   isStrNrm M = Σ[ Nat ] (λ x → isStrNrmₗₑᵥ x M)
+  normal-isStrNrm : ∀ {n M} → is-normal {n} M → isStrNrm M
+  normal-isStrNrm isnrm = zero ,, strnrm-nrm isnrm
+
+  strnrmₗₑᵥ-rename : ∀ {n m} (f : Fin n → Fin m) {k M} → isStrNrmₗₑᵥ k (rename M f) → isStrNrmₗₑᵥ k M
+  strnrmₗₑᵥ-rename f (strnrm-nrm isnrm) =
+    strnrm-nrm (nrm-rename f isnrm)
+  strnrmₗₑᵥ-rename f (strnrm-stp fnc) =
+    strnrm-stp (λ {N} s → strnrmₗₑᵥ-rename f (fnc {rename N f} (⟶-rename f s)))
+  strnrmₗₑᵥ-ext : ∀ {n k M} → isStrNrmₗₑᵥ k (ext {n} M) → isStrNrmₗₑᵥ k M
+  strnrmₗₑᵥ-ext {n} = strnrmₗₑᵥ-rename (fs {n})
+
+  strnrm-rename : ∀ {n m} (f : Fin n → Fin m) {M} → isStrNrm (rename M f) → isStrNrm M
+  strnrm-rename f {M} fMsn = pj1 fMsn ,, strnrmₗₑᵥ-rename f (pj2 fMsn)
+  strnrm-ext : ∀ {n M} → isStrNrm (ext {n} M) → isStrNrm M
+  strnrm-ext {n} = strnrm-rename (fs {n})
 
   strnrm-upw : ∀ {n k M} → isStrNrmₗₑᵥ {n} k M → ∀ {l} → k ≤N l → isStrNrmₗₑᵥ l M
   strnrm-upw (strnrm-nrm nrmM) {zero} dq = strnrm-nrm nrmM
@@ -1235,13 +1362,28 @@ module Lambda-Calculus where
   strnrm-upw (strnrm-stp snstp) {suc l} dq = strnrm-stp (λ {N} stp → strnrm-upw (snstp stp) dq)
 
   strnrm-⟶ₗₑᵥ : ∀ {k n M N} → isStrNrmₗₑᵥ {n} k M → M ⟶ N → isStrNrm N
-  strnrm-⟶ₗₑᵥ (strnrm-nrm nrmM) stp = N₀ind (nrmM _ stp)
+  strnrm-⟶ₗₑᵥ {k} (strnrm-nrm nrmM) stp = N₀ind (nrmM _ stp) -- zero ,, 
   strnrm-⟶ₗₑᵥ {k = suc k} (strnrm-stp snstp) stp = k ,, snstp stp
-
   strnrm-⟶ : ∀ {n M N} → isStrNrm {n} M → M ⟶ N → isStrNrm N
   strnrm-⟶ {n} snM = strnrm-⟶ₗₑᵥ (pj2 snM)
 
-  -- number of one step β-reductions from a term
+  strnrmₗₑᵥ-lam : ∀ {n k M} → isStrNrmₗₑᵥ k (lam {n} M) → isStrNrmₗₑᵥ k M
+  strnrmₗₑᵥ-lam (strnrm-nrm isnrm) = strnrm-nrm (nrm-lam isnrm)
+  strnrmₗₑᵥ-lam (strnrm-stp fnc) = strnrm-stp (λ s → strnrmₗₑᵥ-lam (fnc (βlam s)))
+  strnrmₗₑᵥ-appₗ : ∀ {n k M N} → isStrNrmₗₑᵥ k (app {n} M N) → isStrNrmₗₑᵥ k M
+  strnrmₗₑᵥ-appₗ (strnrm-nrm isnrm) = strnrm-nrm (nrm-appₗ isnrm)
+  strnrmₗₑᵥ-appₗ (strnrm-stp fnc) = strnrm-stp (λ s → strnrmₗₑᵥ-appₗ (fnc (βappₗ s)))
+  strnrmₗₑᵥ-appᵣ : ∀ {n k M N} → isStrNrmₗₑᵥ k (app {n} M N) → isStrNrmₗₑᵥ k N
+  strnrmₗₑᵥ-appᵣ (strnrm-nrm isnrm) = strnrm-nrm (nrm-appᵣ isnrm)
+  strnrmₗₑᵥ-appᵣ (strnrm-stp fnc) = strnrm-stp (λ s → strnrmₗₑᵥ-appᵣ (fnc (βappᵣ s)))
+  strnrm-lam : ∀ {n M} → isStrNrm (lam {n} M) → isStrNrm M
+  strnrm-lam sn = pj1 sn ,, strnrmₗₑᵥ-lam (pj2 sn)
+  strnrm-appₗ : ∀ {n M N} → isStrNrm (app {n} M N) → isStrNrm M
+  strnrm-appₗ sn = pj1 sn ,, strnrmₗₑᵥ-appₗ (pj2 sn)
+  strnrm-appᵣ : ∀ {n M N} → isStrNrm (app {n} M N) → isStrNrm N
+  strnrm-appᵣ sn = pj1 sn ,, strnrmₗₑᵥ-appᵣ (pj2 sn)
+
+-- number of one step β-reductions from a term
   ⟶# : ∀ {n} → Trm n → Nat
   ⟶# (var i) = zero
   ⟶# (lam M) = ⟶# M
@@ -1435,6 +1577,7 @@ module Lambda-Calculus where
   ⟶#suc-Σ⟶ : ∀ {n M} → Σ[ Nat ] (λ x → suc x == ⟶# M) → Σ[ Trm n ] (M ⟶_)
   ⟶#suc-Σ⟶ {n} {M} z = ⟶enm M (Fin-suc-is-inhab (pj2 z))
 
+  -- it is decideble wehther a term reduces or not
   ⟶Cases : ∀ {n} (M : Trm n) → Set
   ⟶Cases {n} M = is-normal M + Σ[ Trm n ] (M ⟶_)
   ⟶cases : ∀ {n} (M : Trm n) → ⟶Cases M
@@ -1487,6 +1630,7 @@ module Lambda-Calculus where
     [ (λ Mnrm → zero ,, strnrm-nrm Mnrm)
     ∣ (λ Ns → strnrm-stp-any-red (pj2 Ns) (λ z → nn (pj2 z)))
     ] (⟶cases M)
-    where
+
+          
 
 -- end of file
