@@ -76,7 +76,6 @@ module simpleTT (A : Set) where
                   → (∀ i → fs (fs (p i)) == p' (fs (fs i)))
                     → Γ' ◂ Γ ∶ p → (S ∣ R ∣ Γ') ◂ (R ∣ S ∣ Γ) ∶ p'
 
-
   -- projections that forget all or just the first variable
   infix 10 _◃_∶_
   data _◃_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
@@ -107,15 +106,66 @@ module simpleTT (A : Set) where
   π-! {[]} p = π-∅
   π-! {R ∣ Γ} p = π-frg {p = N₀ind} R N₀ind (π-! {Γ} _)
 
-{-
+
   -- projections are closed under composition
   -- (does not seem to be needed, perhaps because we work pointwise)
-  π-cmp : ∀ {Γ Δ Θ p q r} → q ∘ p == r
+  π-cmp : ∀ {Γ Δ Θ p q r} → (∀ i → q (p i) == r i)
              → Γ ◂ Δ ∶ p → Δ ◂ Θ ∶ q → Γ ◂ Θ ∶ r
-  π-cmp eq π-∅ πq = π-! _
-  π-cmp eq (π-frg R eqs πp) πq = {!!}
-  π-cmp eq (π-cnc R eqz eqs πp) πq = {!!}
-  π-cmp eq (π-swp R S eqz eqsz eqss πp) πq = {!!}
+  π-cmp {[]} {[]} {Θ} {p} {q} {r} tr π-∅ πq =
+    π-! _
+  π-cmp {Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r} tr
+        (π-frg {p = p₀} R eqp₀ πp₀) (π-frg {p = q₀} S eqq₀ πq₀) =
+    π-frg {p = q₀ ∘ fs ∘ p₀} {r} S
+          (λ i → =proof fs (q₀ (fs (p₀ i)))    ==[ eqq₀ (fs (p₀ i)) ] /
+                          q (fs (p₀ i))         ==[ =ap q (eqp₀ i) ] /
+                          q (p i)               ==[ tr i ]∎
+                          r i ∎)
+          (π-cmp (λ i → =ap q₀ (eqp₀ i ⁻¹)) (π-frg {p = p₀} R eqp₀ πp₀) πq₀)
+  π-cmp {Γ} {R ∣ Δ} {R ∣ Θ} {p} {q} {r} tr
+        (π-frg {p = p₀} R eqp₀ πp₀) (π-cnc {p = q₀} S eqzq₀ eqsq₀ πq₀) =
+    π-frg {p = q₀ ∘ p₀} R
+          (λ i → =proof fs (q₀ (p₀ i))    ==[ eqsq₀ (p₀ i) ] /
+                         q (fs (p₀ i))         ==[ =ap q (eqp₀ i) ] /
+                         q (p i)               ==[ tr i ]∎
+                         r i ∎)
+          (π-cmp (λ _ → =rf) πp₀ πq₀)
+  π-cmp {Γ} {R ∣ (S ∣ Δ)} {S ∣ R ∣ Θ} {p} {q} {r} tr
+        (π-frg {p = p₀} R eqp₀ πp₀) (π-swp S R eqzq₀ eqszq₀ eqssq₀ πq₀) =
+    {!!} -- hot to fill this...?
+    -- a canonical term of `Γ ◂ S ∣ R ∣ Θ ∶ r` must be of the form `π-frg`
+    -- but it forgets `S`, and `r` should forget `R` instead`.
+  π-cmp {R ∣ Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r} tr
+        (π-cnc R eqzp₀ eqsp₀ πp₀) (π-frg S eqzq₀ πq₀) =
+    {!!}
+  π-cmp {R ∣ Γ} {R ∣ Δ} {R ∣ Θ} {p} {q} {r} tr
+        (π-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) (π-cnc {p = q₀} R eqzq₀ eqsq₀ πq₀) =
+    π-cnc {p = q₀ ∘ p₀} R
+          (=proof fz           ==[ eqzq₀ ] /
+                  q fz         ==[ =ap q eqzp₀ ] /
+                  q (p fz)     ==[ tr fz ]∎
+                  r fz ∎)
+          (λ i → =proof fs (q₀ (p₀ i))       ==[ eqsq₀ (p₀ i) ] /
+                         q (fs (p₀ i))        ==[ =ap q (eqsp₀ i) ] /
+                         q (p (fs i))         ==[ tr (fs i) ]∎
+                         r (fs i) ∎)
+          (π-cmp (λ _ → =rf) πp₀ πq₀)
+  π-cmp {R ∣ Γ} {R ∣ S ∣ Δ} {S ∣ R ∣ Θ} {p} {q} {r} tr
+        (π-cnc R eqzp₀ eqsp₀ πp₀) (π-swp S R eqzq₀ eqszq₀ eqssq₀ πq₀) =
+    {!!}
+  π-cmp {S ∣ R ∣ Γ} {R ∣ S ∣ Δ} {Θ} {p} {q} {r} tr (π-swp R S x x₁ x₂ πp₀) πq = {!!}
+
+{-
+  π-cmp tr π-∅ πq =
+    π-! _
+
+ {Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r}
+        tr (π-frg {p = p'} R eqsp πp') (π-frg {p = q'} S eqsq πq') =
+    π-frg {p = q' ∘ fs ∘ p'} {r} S
+          (λ i → =proof fs (q' (fs (p' i)))    ==[ eqsq (fs (p' i)) ] /
+                          q (fs (p' i))         ==[ =ap q (eqsp i) ] /
+                          q (p i)               ==[ tr i ]∎
+                          r i ∎)
+          (π-cmp (λ i → =ap q' (eqsp i ⁻¹)) (π-frg {p = p'} R eqsp πp') πq')
 -}
 
   -- projections forget variables
@@ -165,25 +215,34 @@ module simpleTT (A : Set) where
 
 
   -- only the functions rearranging occurences of types in contexts
+  -- in order not to use function extensionality,
+  -- constructors are formulated invariant under pointwise equality
   data _≡_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
     ∅ : ∀ {f} → [] ≡ [] ∶ f
     ≡∶cnc : ∀ {Γ Γ' f f'} R → (fz == f' fz) → (∀ i → fs (f i) == f' (fs i))
-                  → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ f'
+               → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ f'
     ≡∶swp : ∀ {Γ Γ' f f'} R S → (fs fz == f' fz) → (fz == f' (fs fz))
-                  → (∀ i → fs (fs (f i)) == f' (fs (fs i)))
-                    → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ f'
+               → (∀ i → fs (fs (f i)) == f' (fs (fs i)))
+                 → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ f'
 
   ≡∶id : ∀ {Γ} → Γ ≡ Γ ∶ id
   ≡∶id {[]} = ∅
   ≡∶id {R ∣ Γ} = ≡∶cnc R =rf (λ _ → =rf) ≡∶id
-
   ≡∶rfl : ∀ {Γ f} → (∀ i → i == f i) → Γ ≡ Γ ∶ f
   ≡∶rfl {[]} eqf = ∅
   ≡∶rfl {R ∣ Γ} eqf = ≡∶cnc R (eqf fz) (λ i → eqf (fs i)) ≡∶id
-
-  swap-first : ∀ {n} → Fin (suc (suc n)) → Fin (suc (suc n))
-  swap-first fz = fs fz
-  swap-first (fs i) = liftFin fs i
+  ≡∶cnc-rf : ∀ {Γ Γ' f} R → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ (liftFin f)
+  ≡∶cnc-rf {Γ'} {Γ} {f} R = ≡∶cnc R =rf (λ _ → =rf)
+  ≡∶swp-rf : ∀ {Γ Γ' f} R S → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ (swapFin f)
+  ≡∶swp-rf {Γ'} {Γ} {f} R S = ≡∶swp R S =rf =rf (λ _ → =rf)
+  ≡∶-= : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
+  ≡∶-= eqf ∅ = ∅
+  ≡∶-= eqf (≡∶cnc P eqz eqs bij) = ≡∶cnc P (eqz • eqf fz) (λ i → eqs i • eqf (fs i)) bij
+  ≡∶-= {f = f} {f'} eqf (≡∶swp {f = g} P Q eqsz eqz eqss bij) =
+    ≡∶swp P Q (fs fz                  ==[ eqsz • eqf fz ]              f' fz         )
+              (fz                     ==[ eqz • eqf (fs fz) ]          f' (fs fz)    )
+              (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
+              bij
 
   ≡∶-same-len : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → len Γ' == len Γ
   ≡∶-same-len {[]} {[]} {f} ∅ =
@@ -192,6 +251,32 @@ module simpleTT (A : Set) where
     =ap suc (≡∶-same-len bij)
   ≡∶-same-len {(R ∣ S ∣ Γ')} {(S ∣ R ∣ Γ)} {f} (≡∶swp R S eqz eqsz eqss bij) =
     =ap (suc ∘ suc) (≡∶-same-len bij)
+
+  ≡∶-cmp : ∀ {Γ Δ Θ f g h} → (∀ i → g (f i) == h i)
+             → Γ ≡ Δ ∶ f → Δ ≡ Θ ∶ g → Γ ≡ Θ ∶ h
+  ≡∶-cmp {[]} {[]} {Θ} {f} {g} {h} tr ∅ qvg =
+    ≡∶-= N₀ind qvg
+  ≡∶-cmp {R ∣ Γ} {R ∣ Δ} {R ∣ Θ} {f} {g} {h} tr
+         (≡∶cnc {f = f₀} R eqzf₀ eqsf₀ qvf₀) (≡∶cnc {f = g₀} R eqzg₀ eqsg₀ qvg₀) =
+    ≡∶cnc R
+          (=proof fz           ==[ eqzg₀ ] /
+                  g fz         ==[ =ap g eqzf₀ ] /
+                  g (f fz)     ==[ tr fz ]∎
+                  h fz ∎)
+          (λ i → =proof fs (g₀ (f₀ i))       ==[ eqsg₀ (f₀ i) ] /
+                         g (fs (f₀ i))        ==[ =ap g (eqsf₀ i) ] /
+                         g (f (fs i))         ==[ tr (fs i) ]∎
+                         h (fs i) ∎)
+          (≡∶-cmp (λ _ → =rf) qvf₀ qvg₀)
+  ≡∶-cmp {R ∣ Γ} {R ∣ S ∣ Δ} {S ∣ R ∣ Θ} {f} {g} {h} tr
+         (≡∶cnc {f = f₀} R eqzf₀ eqsf₀ qvf₀) (≡∶swp {f = g₀} S R eqzg₀ eqszg₀ eqssg₀ qvg₀) =
+    {!!}
+  ≡∶-cmp {S ∣ R ∣ Γ} {R ∣ S ∣ Δ} {R ∣ Θ} {f} {g} {h} tr
+         (≡∶swp R S eqzf₀ eqszf₀ eqssf₀ qvf₀) (≡∶cnc R eqzg₀ eqsg₀ qvg) =
+    {!!}
+  ≡∶-cmp {S ∣ R ∣ Γ} {R ∣ S ∣ Δ} {S ∣ R ∣ Θ} {f} {g} {h} tr
+         (≡∶swp R S eqzf₀ eqszf₀ eqssf₀ qvf₀) (≡∶swp S R eqzg₀ eqszg₀ eqssg₀ qvg) =
+    {!!}
 
   -- the bijections are the projections between contexts of the same length
   ≡∶to◂∶ : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → Γ' ◂ Γ ∶ f
@@ -206,15 +291,6 @@ module simpleTT (A : Set) where
   ◂∶to≡∶ eq (π-swp R S eqz eqsz eqss πp) = ≡∶swp R S eqz eqsz eqss (◂∶to≡∶ (suc-inj (suc-inj eq)) πp)
   -- these two probably form an equivalence of types
   -- between Γ' ≡ Γ ∶ p and (len Γ == len Γ') × (Γ' ◂ Γ ∶ p)
-
-  ≡∶-= : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
-  ≡∶-= eqf ∅ = ∅
-  ≡∶-= eqf (≡∶cnc P eqz eqs bij) = ≡∶cnc P (eqz • eqf fz) (λ i → eqs i • eqf (fs i)) bij
-  ≡∶-= {f = f} {f'} eqf (≡∶swp {f = g} P Q eqsz eqz eqss bij) =
-    ≡∶swp P Q (fs fz                  ==[ eqsz • eqf fz ]              f' fz         )
-              (fz                     ==[ eqz • eqf (fs fz) ]          f' (fs fz)    )
-              (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
-              bij
 
   ∋v∶-= : ∀ {Γ T x x'} → x == x' → Γ ∋ x ∶ T → Γ ∋ x' ∶ T
   ∋v∶-= {Γ} {T} = =transp (λ x → Γ ∋ x ∶ T)
@@ -242,10 +318,18 @@ module simpleTT (A : Set) where
   ≡∶-congr-⊢ bij (⊢-abs {T = T} der) = ⊢-abs (≡∶-congr-⊢ (≡∶cnc T =rf (λ _ → =rf) bij) der)
   ≡∶-congr-⊢ bij (⊢-app der₁ der₂) = ⊢-app (≡∶-congr-⊢ bij der₁) (≡∶-congr-⊢ bij der₂)
 
+  -- if a type occurs in a context, WLOG it occurs in the first position
   ≡∶-occur : ∀ {Γ T i} → Γ ∋ i ∶ T
                → Σ[ Ctx ] (λ x →
                    Σ[ (Fin (suc (len x)) → Fin (len Γ)) ] ((T ∣ x) ≡ Γ ∶_))
-  ≡∶-occur {Γ} {T} {i} pf = {!!}
+  ≡∶-occur {T ∣ Γ} {T} {fz} here =
+    Γ
+    ,, (id
+    ,, ≡∶id)
+  ≡∶-occur {R ∣ Γ} {T} {fs i} (there pf) =
+    (R ∣ pj1 (≡∶-occur pf))
+    ,, ( (liftFin (pj1 (pj2 (≡∶-occur pf))) ∘ swapFin id)
+    ,, {!≡∶cnc-rf R (pj2 (pj2 (≡∶-occur pf)))!} )
 
   -- three useful properties of projections
   π-= : ∀ {Γ Γ' p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'

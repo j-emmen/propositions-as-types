@@ -427,6 +427,11 @@ module Nat-and-Fin where
   liftFin f (fs i) = fs (f i)
   -- listFin f = [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
 
+  -- lift that swaps the first two elements
+  swapFin : ∀ {n m} → (Fin n → Fin m) → Fin (suc (suc n)) → Fin (suc (suc m))
+  swapFin f fz = fs fz
+  swapFin f (fs i) = liftFin (fs ∘ f) i
+
   -- some properties of it
   liftFin-id : ∀ {n f} → (∀ i → f i == i) → ∀ i → liftFin {n} f i == i
   liftFin-id isid fz = =rf
