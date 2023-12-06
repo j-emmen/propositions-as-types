@@ -7,7 +7,7 @@ module Basic-Inductives where
   id : {A : Set} → A → A
   id = λ x → x
 
-  infixr 2 _∘_ _∘'_
+  infixr 4 _∘_ _∘'_
   _∘_ : {A B C : Set} → (B → C) → (A → B) → A → C
   g ∘ f = λ x → g (f x)
   _∘'_ : {A' A : Set} → (A → Set) → (A' → A) → A' → Set
@@ -114,9 +114,19 @@ module Basic-Inductives where
     fz : ∀ {n} → Fin (suc n)
     fs : ∀ {n} → Fin n → Fin (suc n)
 
+  Fin-ind : ∀ {n} (C : Fin (suc n) → Set) → (cz : C fz) → (cs : ∀ j → C (fs j)) → ∀ j → C j
+  Fin-ind C cz cs fz = cz
+  Fin-ind C cz cs (fs j) = cs j
+  Fin-rec : ∀ {n} {C : Set} → (cz : C) → (cs : Fin n → C) → Fin (suc n) → C
+  Fin-rec cz cs fz = cz
+  Fin-rec cz cs (fs j) = cs j
+
   fp : ∀ {n} → Fin (suc (suc n)) → Fin (suc n)
   fp fz = fz
   fp (fs i) = i
+  fi : ∀ {n} → Fin n → Fin (suc n)
+  fi {suc n} fz = fz
+  fi {suc n} (fs i) = fs (fi i)
 
   N₀ N₁ N₂ : Set
   N₀ = Fin zero
@@ -127,6 +137,8 @@ module Basic-Inductives where
   0₂ 1₂ : N₂
   0₂ = fz
   1₂ = fs 0₁
+  N₀rec : {C : Set} → N₀ → C
+  N₀rec {C} ()
   N₀ind : {C : N₀ → Set} → (x : N₀) → C x
   N₀ind {C} ()
   N₁ind : {C : N₁ → Set}(c : C 0₁) → (x : N₁) → C x
@@ -143,7 +155,7 @@ module Basic-Inductives where
   dec→¬¬e (inr na) = λ f → N₀ind (f na)
 
   ¬Σ→Π¬ : ∀ {A} {B : A → Set} → ¬ (Σ[ A ] B) → ∀ a → ¬ (B a)
-  ¬Σ→Π¬ ne = λ a → ne ∘ a ,,_
+  ¬Σ→Π¬ ne = λ a → ne ∘ (a ,,_)
   Π¬→¬Σ : ∀ {A} {B : A → Set} → (∀ a → ¬ (B a)) → ¬ (Σ[ A ] B)
   Π¬→¬Σ an = λ z → an (pj1 z) (pj2 z)
 

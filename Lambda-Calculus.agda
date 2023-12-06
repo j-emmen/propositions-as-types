@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --allow-unsolved-metas #-}
+{-# OPTIONS --without-K #-}
 
 module Lambda-Calculus where
   open import Nat-and-Fin
@@ -48,7 +48,7 @@ module Lambda-Calculus where
                     (=J (λ _ u → app-inj (=ap₂ app =rf u) == =rf , u) =rf)
                     (prj1 pp)
                     (prj2 pp)
-                • prdη pp)
+                • ×η pp)
 
   var≠lam : ∀ {n} i M → ¬ (var {n} i == lam M)
   var≠lam {n} i M = λ u → (fam ● u) 0₁
@@ -141,7 +141,7 @@ module Lambda-Calculus where
   #≠0 : ∀ {n} {M : Trm n} → ¬ (# M == zero)
   #≠0 {n} {var i} = PA4
   #≠0 {n} {lam M} = PA4
-  #≠0 {n} {app M N} = #≠0 {n} {M} ∘ sum-0-is-0
+  #≠0 {n} {app M N} = #≠0 {n} {M} ∘ sum-0-is-0⁻¹
 
   #-pos : ∀ {n} {M} → one ≤N # {n} M
   #-pos {n} {var i} = 0₁
@@ -195,7 +195,7 @@ module Lambda-Calculus where
   rename-ptw (var x) {f} pf =
     =ap var (pf x)
   rename-ptw (lam M) {f} pf =
-    =ap lam (rename-ptw M (liftFin-ptw pf))
+    =ap lam (rename-ptw M (liftFin-ap pf))
   rename-ptw (app M N) {f} pf =
     =ap₂ app (rename-ptw M pf) (rename-ptw N pf)
   rename-inj : ∀ {n m} {f : Fin n → Fin m} (finj : ∀ {x x'} → f x == f x' → x == x')
@@ -224,9 +224,9 @@ module Lambda-Calculus where
   
 
   -- renaming along a variables-projection is the same as iterated extension (weakening)
-  rename-prj-is-ext : ∀ k {n} M → rename {n} M (Fin-+Nto→ k) == ext[ k ] M
+  rename-prj-is-ext : ∀ k {n} M → rename {n} M (Fin+N-inr {k}) == ext[ k ] M
   rename-prj-is-ext zero M = rename-id M (λ _ → =rf)
-  rename-prj-is-ext (suc k) M = rename-act M (Fin-+Nto→ k) fs ⁻¹ • =ap ext (rename-prj-is-ext k M)
+  rename-prj-is-ext (suc k) M = rename-act M (Fin+N-inr {k}) fs ⁻¹ • =ap ext (rename-prj-is-ext k M)
 
   rename-lam-is-lam : ∀ {n m M} (f : Fin n → Fin m) → Trm-is-lam M → Trm-is-lam (rename M f)
   rename-lam-is-lam f islam =
@@ -234,12 +234,13 @@ module Lambda-Calculus where
     ,, =ap (λ x → rename x f) (pj2 islam)
   ext-lam-is-lam : ∀ {n M} → Trm-is-lam M → Trm-is-lam (ext {n} M)
   ext-lam-is-lam = rename-lam-is-lam fs
+
+{-
   rename-lam-is-lam⁻¹ : ∀ {n m M} (f : Fin n → Fin m) → Trm-is-lam (rename M f) → Trm-is-lam M
   rename-lam-is-lam⁻¹ f islam = {!pj2 islam!}
   ext-lam-is-lam⁻¹ : ∀ {n M} → Trm-is-lam (ext {n} M) → Trm-is-lam M
   ext-lam-is-lam⁻¹ {n} {M} (P ,, eq) = {!(Trm-is-lam ● eq)!}
 
-{-
     rename (pj1 islam) (Fin-diag {n})
     ,, {!=proof lam (rename (pj1 islam) (Fin-diag {n})) ==[ ? ] /
                --rename (lam (pj1 islam)) (Fin-diag {n}) ==[ ? ] /
@@ -1560,16 +1561,16 @@ module Lambda-Calculus where
   ⟶enm-idTrm : ∀ {n} M {N} (stp : M ⟶ N) → ⟶enm {n} M (⟶enm⁻¹ M stp) == (N ,, stp)
   ⟶enm-idTrm M {N} stp = prj2 (pj2 (⟶enm-invrt M)) (N ,, stp)
 
-  ⟶#0-¬Σ⟶ : ∀ {n M} → ⟶# {n} M == zero → ¬ (Σ[ Trm n ] (M ⟶_))
-  ⟶#0-¬Σ⟶ {n} {M} eq = Fin-=to→ eq ∘ pj1 (⟶enm-invrt M)
-  ⟶#0-is-nrm : ∀ {n M} → ⟶# {n} M == zero → is-normal M
+  ⟶#0-¬Σ⟶ : ∀ {n M} → zero == ⟶# {n} M → ¬ (Σ[ Trm n ] (M ⟶_))
+  ⟶#0-¬Σ⟶ {n} {M} eq = Fin-=to→ (eq ⁻¹) ∘ pj1 (⟶enm-invrt M)
+  ⟶#0-is-nrm : ∀ {n M} → zero == ⟶# {n} M → is-normal M
   ⟶#0-is-nrm {n} {M} = ¬Σ→Π¬ ∘ ⟶#0-¬Σ⟶ {M = M}
-  is-nrm-⟶#0 : ∀ {n M} → is-normal M → ⟶# {n} M == zero
+  is-nrm-⟶#0 : ∀ {n M} → is-normal M → zero == ⟶# {n} M
   is-nrm-⟶#0 {n} {M} nrm =
     [ id
-    ∣ (λ z → N₀ind (nrm _ (pj2 (⟶enm M (Fin-=to→ (pj2 z ⁻¹) fz)))))
+    ∣ (λ z → N₀ind (nrm _ (pj2 (⟶enm M (Fin-=to→ (pj2 z) fz)))))
     ] (Nat-dicot (⟶# M))
-  ¬Σ⟶-⟶#0 : ∀ {n M} → ¬ (Σ[ Trm n ] (M ⟶_)) → ⟶# {n} M == zero
+  ¬Σ⟶-⟶#0 : ∀ {n M} → ¬ (Σ[ Trm n ] (M ⟶_)) → zero == ⟶# {n} M
   ¬Σ⟶-⟶#0 {n} {M} = (is-nrm-⟶#0 {n} {M} ∘ ¬Σ→Π¬)
 
   Σ⟶-⟶#suc : ∀ {n M} → Σ[ Trm n ] (M ⟶_) → Σ[ Nat ] (λ x → suc x == ⟶# M)
@@ -1583,7 +1584,7 @@ module Lambda-Calculus where
   ⟶cases : ∀ {n} (M : Trm n) → ⟶Cases M
   ⟶cases {n} M =
     [ inl ∘ ⟶#0-is-nrm
-    ∣ inr ∘ (λ z → ⟶enm M (Fin-=to→ (pj2 z ⁻¹) fz))
+    ∣ inr ∘ (λ z → ⟶enm M (Fin-=to→ (pj2 z) fz))
     ] (Nat-dicot (⟶# M))
 
 

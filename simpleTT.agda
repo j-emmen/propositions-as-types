@@ -64,179 +64,189 @@ module simpleTT (A : Set) where
   ⊢∶-∋∶ : ∀ {Γ T M} → Γ ⊢ M ∶ T → ∀ {i} → M == var i → Γ ∋ i ∶ T
   ⊢∶-∋∶ der eq = ⊢v∶-∋∶ (⊢∶-= eq der)
 
-  -- projections of variables, possibly rearranging occurences of types in contexts
+  -- projections of variables, which are the injective functions
   infix 10 _◂_∶_
-  data _◂_∶_ : (Γ' Γ : Ctx) → (Fin (len Γ') → Fin (len Γ)) → Set where
-    π-∅ : ∀ {p} → [] ◂ [] ∶ p
-    π-frg : ∀ {Γ' Γ p p'} R → (∀ i → fs (p i) == p' i)
-               → Γ' ◂ Γ ∶ p → Γ' ◂ R ∣ Γ ∶ p'
-    π-cnc : ∀ {Γ' Γ p p'} R → fz == p' fz → (∀ i → fs (p i) == p' (fs i))
-               → Γ' ◂ Γ ∶ p → (R ∣ Γ') ◂ (R ∣ Γ) ∶ p'
-    π-swp : ∀ {Γ' Γ p p'} R S → (fs fz == p' fz) → (fz == p' (fs fz))
-                  → (∀ i → fs (fs (p i)) == p' (fs (fs i)))
-                    → Γ' ◂ Γ ∶ p → (S ∣ R ∣ Γ') ◂ (R ∣ S ∣ Γ) ∶ p'
+  _◂_∶_ :  (Γ' Γ : Ctx) → (Fin (len Γ') → Fin (len Γ)) → Set
+  Γ' ◂ Γ ∶ p = ∀ {i j} → p i == p j → i == j
 
-  -- projections that forget all or just the first variable
-  infix 10 _◃_∶_
-  data _◃_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
-    π'-! : ∀ {Γ' p} → [] ◃ Γ' ∶ p
-    π'-frg : ∀ {Γ p} R → (∀ i → fs i == p i) → Γ ◃ R ∣ Γ ∶ p
-
-  π-id : ∀ {Γ} → Γ ◂ Γ ∶ id
-  π-id {[]} = π-∅
-  π-id {R ∣ Γ} = π-cnc R =rf (λ _ → =rf) π-id
-
-  ◃to◂ : ∀ {Γ Γ' p} → Γ ◃ Γ' ∶ p → Γ ◂ Γ' ∶ p
-  ◃to◂ {Γ' = []} π'-! = π-∅
-  ◃to◂ {Γ' = R ∣ Γ'} π'-! = π-frg {p = N₀ind} R N₀ind (◃to◂ π'-!)
-  ◃to◂ (π'-frg R eq) = π-frg R eq π-id
-
-  π-rfl : ∀ {Γ p} → (∀ i → i == p i) → Γ ◂ Γ ∶ p
-  π-rfl {[]} eqp = π-∅
-  π-rfl {R ∣ Γ} eqp = π-cnc R (eqp fz) (λ i → eqp (fs i)) π-id
-
-  π'-dsp : ∀ {Γ R} → Γ ◃ R ∣ Γ ∶ fs
-  π'-dsp {Γ} {R} = π'-frg R (λ _ → =rf)
-
-  -- these two terms below could be derived from ◃to◂
-  π-dsp : ∀ {Γ R} → Γ ◂ R ∣ Γ ∶ fs
-  π-dsp {Γ} {R} = π-frg R (λ _ → =rf) π-id
-
+  π-id : ∀ {Γ p} → (∀ i → p i == i) → Γ ◂ Γ ∶ p
+  π-id isid {i} {j} e = isid i ⁻¹ • e • isid j 
+  π-∅ : ∀ {p} → [] ◂ [] ∶ p
+  π-∅ {p} = π-id N₀ind
   π-! : ∀ {Γ} p → [] ◂ Γ ∶ p
-  π-! {[]} p = π-∅
-  π-! {R ∣ Γ} p = π-frg {p = N₀ind} R N₀ind (π-! {Γ} _)
-
-
-  -- projections are closed under composition
-  -- (does not seem to be needed, perhaps because we work pointwise)
+  π-! {Γ} p {i} {j} _ = N₀ind {i ==_} j
+  π-dsp : ∀ {Γ} R → Γ ◂ R ∣ Γ ∶ fs
+  π-dsp R = fs-inj
+  π-cmp-rf : ∀ {Γ Δ Θ p q} → Γ ◂ Δ ∶ p → Δ ◂ Θ ∶ q → Γ ◂ Θ ∶ (q ∘ p)
+  π-cmp-rf πp πq e = πp (πq e)
+  ◂∶-= : ∀ {Γ' Γ p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
+  ◂∶-= eqp πp {i} {j} e = πp (eqp i • e • eqp j ⁻¹)
+  π-frg-rf : ∀ {Γ' Γ p} R → R ∣ Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ (p ∘ fs)
+  π-frg-rf R πp e = fs-inj (πp e) 
+  π-cnc-rf : ∀ {Γ' Γ p } R → Γ' ◂ Γ ∶ p → (R ∣ Γ') ◂ (R ∣ Γ) ∶ (liftFin p)
+  π-cnc-rf R πp {i} {j} e = liftFin-inj πp e
+  π-swp-rf : ∀ {Γ' Γ p } R S → R ∣ S ∣ Γ' ◂ Γ ∶ p → S ∣ R ∣ Γ' ◂ Γ ∶ (p ∘ swapFin id)
+  π-swp-rf R S πp {i} {j} e = swapFin-inj id (πp e)
   π-cmp : ∀ {Γ Δ Θ p q r} → (∀ i → q (p i) == r i)
              → Γ ◂ Δ ∶ p → Δ ◂ Θ ∶ q → Γ ◂ Θ ∶ r
-  π-cmp {[]} {[]} {Θ} {p} {q} {r} tr π-∅ πq =
-    π-! _
-  π-cmp {Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r} tr
-        (π-frg {p = p₀} R eqp₀ πp₀) (π-frg {p = q₀} S eqq₀ πq₀) =
-    π-frg {p = q₀ ∘ fs ∘ p₀} {r} S
-          (λ i → =proof fs (q₀ (fs (p₀ i)))    ==[ eqq₀ (fs (p₀ i)) ] /
-                          q (fs (p₀ i))         ==[ =ap q (eqp₀ i) ] /
-                          q (p i)               ==[ tr i ]∎
-                          r i ∎)
-          (π-cmp (λ i → =ap q₀ (eqp₀ i ⁻¹)) (π-frg {p = p₀} R eqp₀ πp₀) πq₀)
-  π-cmp {Γ} {R ∣ Δ} {R ∣ Θ} {p} {q} {r} tr
-        (π-frg {p = p₀} R eqp₀ πp₀) (π-cnc {p = q₀} S eqzq₀ eqsq₀ πq₀) =
-    π-frg {p = q₀ ∘ p₀} R
-          (λ i → =proof fs (q₀ (p₀ i))    ==[ eqsq₀ (p₀ i) ] /
-                         q (fs (p₀ i))         ==[ =ap q (eqp₀ i) ] /
-                         q (p i)               ==[ tr i ]∎
-                         r i ∎)
-          (π-cmp (λ _ → =rf) πp₀ πq₀)
-  π-cmp {Γ} {R ∣ (S ∣ Δ)} {S ∣ R ∣ Θ} {p} {q} {r} tr
-        (π-frg {p = p₀} R eqp₀ πp₀) (π-swp S R eqzq₀ eqszq₀ eqssq₀ πq₀) =
-    {!!} -- hot to fill this...?
-    -- a canonical term of `Γ ◂ S ∣ R ∣ Θ ∶ r` must be of the form `π-frg`
-    -- but it forgets `S`, and `r` should forget `R` instead`.
-  π-cmp {R ∣ Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r} tr
-        (π-cnc R eqzp₀ eqsp₀ πp₀) (π-frg S eqzq₀ πq₀) =
-    {!!}
-  π-cmp {R ∣ Γ} {R ∣ Δ} {R ∣ Θ} {p} {q} {r} tr
-        (π-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) (π-cnc {p = q₀} R eqzq₀ eqsq₀ πq₀) =
-    π-cnc {p = q₀ ∘ p₀} R
-          (=proof fz           ==[ eqzq₀ ] /
-                  q fz         ==[ =ap q eqzp₀ ] /
-                  q (p fz)     ==[ tr fz ]∎
-                  r fz ∎)
-          (λ i → =proof fs (q₀ (p₀ i))       ==[ eqsq₀ (p₀ i) ] /
-                         q (fs (p₀ i))        ==[ =ap q (eqsp₀ i) ] /
-                         q (p (fs i))         ==[ tr (fs i) ]∎
-                         r (fs i) ∎)
-          (π-cmp (λ _ → =rf) πp₀ πq₀)
-  π-cmp {R ∣ Γ} {R ∣ S ∣ Δ} {S ∣ R ∣ Θ} {p} {q} {r} tr
-        (π-cnc R eqzp₀ eqsp₀ πp₀) (π-swp S R eqzq₀ eqszq₀ eqssq₀ πq₀) =
-    {!!}
-  π-cmp {S ∣ R ∣ Γ} {R ∣ S ∣ Δ} {Θ} {p} {q} {r} tr (π-swp R S x x₁ x₂ πp₀) πq = {!!}
+  π-cmp tr πp πq = ◂∶-= tr (π-cmp-rf πp πq)
+  π-frg : ∀ {Γ' Γ p p'} R → (∀ i → p (fs i) == p' i)
+             → R ∣ Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
+  π-frg R eq πp =
+    ◂∶-= eq (π-frg-rf R πp)
+  π-cnc : ∀ {Γ' Γ p p'} R → fz == p' fz → (∀ i → fs (p i) == p' (fs i))
+                → Γ' ◂ Γ ∶ p → (R ∣ Γ') ◂ (R ∣ Γ) ∶ p'
+  π-cnc R eqz eqs πp =
+    ◂∶-= {R ∣ _} {R ∣ _} (liftFin-ptw eqz eqs) (π-cnc-rf R πp)
+  π-swp : ∀ {Γ' Γ p p'} R S → (p (fs fz) == p' fz) → (p fz == p' (fs fz))
+             → (∀ i → p (fs (fs i)) == p' (fs (fs i)))
+                   → R ∣ S ∣ Γ' ◂ Γ ∶ p → S ∣ R ∣ Γ' ◂ Γ ∶ p'
+  π-swp {p = p} R S eqz eqsz eqss πp =
+    ◂∶-= {S ∣ R ∣ _} (swapFin-pcmp {f = p} eqz eqsz eqss) (π-swp-rf R S πp)
 
-{-
-  π-cmp tr π-∅ πq =
-    π-! _
 
- {Γ} {R ∣ Δ} {S ∣ Θ} {p} {q} {r}
-        tr (π-frg {p = p'} R eqsp πp') (π-frg {p = q'} S eqsq πq') =
-    π-frg {p = q' ∘ fs ∘ p'} {r} S
-          (λ i → =proof fs (q' (fs (p' i)))    ==[ eqsq (fs (p' i)) ] /
-                          q (fs (p' i))         ==[ =ap q (eqsp i) ] /
-                          q (p i)               ==[ tr i ]∎
-                          r i ∎)
-          (π-cmp (λ i → =ap q' (eqsp i ⁻¹)) (π-frg {p = p'} R eqsp πp') πq')
--}
+  -- inductive attempt
+  infix 10 _◂ᵢ_∶_
+  data _◂ᵢ_∶_ : (Γ' Γ : Ctx) → (Fin (len Γ') → Fin (len Γ)) → Set where
+    πᵢ-∅ : ∀ {p} → [] ◂ᵢ [] ∶ p
+    πᵢ-frg : ∀ {Γ' Γ p p'} R → (∀ i → fs (p i) == p' i)
+               → Γ' ◂ᵢ Γ ∶ p → Γ' ◂ᵢ R ∣ Γ ∶ p'
+               -- might need to turn this into a destructor
+    πᵢ-cnc : ∀ {Γ' Γ p p'} R → fz == p' fz → (∀ i → fs (p i) == p' (fs i))
+               → Γ' ◂ᵢ Γ ∶ p → (R ∣ Γ') ◂ᵢ (R ∣ Γ) ∶ p'
+    πᵢ-swp : ∀ {Γ' Γ p p'} R S → (p (fs fz) == p' fz) → (p fz == p' (fs fz))
+                  → (∀ i → p (fs (fs i)) == p' (fs (fs i)))
+                    → R ∣ S ∣ Γ' ◂ᵢ Γ ∶ p → S ∣ R ∣ Γ' ◂ᵢ Γ ∶ p'
+
+  πᵢ-id : ∀ {Γ} → Γ ◂ᵢ Γ ∶ id
+  πᵢ-id {[]} = πᵢ-∅
+  πᵢ-id {R ∣ Γ} = πᵢ-cnc R =rf (λ _ → =rf) πᵢ-id
+  πᵢ-rfl : ∀ {Γ p} → (∀ i → i == p i) → Γ ◂ᵢ Γ ∶ p
+  πᵢ-rfl {[]} eqp = πᵢ-∅
+  πᵢ-rfl {R ∣ Γ} eqp = πᵢ-cnc R (eqp fz) (λ i → eqp (fs i)) πᵢ-id
+  πᵢ-! : ∀ {Γ} p → [] ◂ᵢ Γ ∶ p
+  πᵢ-! {[]} p = πᵢ-∅
+  πᵢ-! {R ∣ Γ} p = πᵢ-frg {p = N₀ind} R N₀ind (πᵢ-! {Γ} _)
+  πᵢ-dsp : ∀ {Γ R} → Γ ◂ᵢ R ∣ Γ ∶ fs
+  πᵢ-dsp {Γ} {R} = πᵢ-frg R (λ _ → =rf) πᵢ-id
+  πᵢ-frg-rf : ∀ {Γ' Γ p} R → Γ' ◂ᵢ Γ ∶ p → Γ' ◂ᵢ R ∣ Γ ∶ (fs ∘ p)
+  πᵢ-frg-rf R = πᵢ-frg R (λ _ → =rf)
+  πᵢ-cnc-rf : ∀ {Γ' Γ p } R → Γ' ◂ᵢ Γ ∶ p → (R ∣ Γ') ◂ᵢ (R ∣ Γ) ∶ (liftFin p)
+  πᵢ-cnc-rf R = πᵢ-cnc R =rf (λ _ → =rf)
+  πᵢ-swp-rf : ∀ {Γ' Γ p } R S → R ∣ S ∣ Γ' ◂ᵢ Γ ∶ p → S ∣ R ∣ Γ' ◂ᵢ Γ ∶ (p ∘ swapFin id)
+  πᵢ-swp-rf R S = πᵢ-swp R S =rf =rf (λ _ → =rf)
+  πᵢ-swp-lft : ∀ {Γ' Γ p p'} R S → (fs fz == p' fz) → (fz == p' (fs fz))
+                  → (∀ i → fs (fs (p i)) == p' (fs (fs i)))
+                    → Γ' ◂ᵢ Γ ∶ p → R ∣ S ∣ Γ' ◂ᵢ S ∣ R ∣ Γ ∶ p'
+  πᵢ-swp-lft {Γ'} {Γ} {p} {p'} R S eqz eqsz eqss πᵢp = 
+    πᵢ-swp {Γ = S ∣ R ∣ Γ} S R eqz eqsz eqss (πᵢ-cnc-rf S (πᵢ-cnc-rf R πᵢp))
+  πᵢ-swp-lft-rf : ∀ {Γ' Γ p} R S → Γ' ◂ᵢ Γ ∶ p → R ∣ S ∣ Γ' ◂ᵢ S ∣ R ∣ Γ ∶ (swapFin p)
+  πᵢ-swp-lft-rf R S = πᵢ-swp-lft R S =rf =rf (λ _ → =rf)
+
+  -- inductive projections forget variables
+  πᵢ-≤ : ∀ {Γ' Γ p} → Γ' ◂ᵢ Γ ∶ p → len Γ' ≤N len Γ
+  πᵢ-≤ πᵢ-∅                              = 0₁
+  πᵢ-≤ {Γ'} {R ∣ Γ} (πᵢ-frg R _ πp)       = ≤+N' {len Γ'} {len Γ} (πᵢ-≤ πp) one
+  πᵢ-≤ (πᵢ-cnc R _ _ πp)                 = πᵢ-≤ πp
+  πᵢ-≤ (πᵢ-swp R S _ _ _ πp)             = πᵢ-≤ πp
+
+  -- indeed the underlying function of an inductive projection is injective
+  πᵢ-inj : ∀ {Γ' Γ p} → Γ' ◂ᵢ Γ ∶ p → ∀ {i j} → p i == p j → i == j
+  πᵢ-inj {p = p} (πᵢ-frg {p = p₀} R eqp₀ πp₀) {i} {j} eq =
+    πᵢ-inj πp₀ (fs-inj (eqp₀ i • eq • eqp₀ j ⁻¹))
+  πᵢ-inj {p = p} (πᵢ-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) {fz} {fz} eq =
+    =rf
+  πᵢ-inj {p = p} (πᵢ-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) {fz} {fs j} eq =
+    N₀ind (PA4-Fin (=proof fz           ==[ eqzp₀ ] /
+                           p fz         ==[ eq ] /
+                           p (fs j)     ==[ eqsp₀ j ⁻¹ ]∎
+                           fs (p₀ j) ∎))
+  πᵢ-inj {p = p} (πᵢ-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) {fs i} {fz} eq =
+    N₀ind (PA4-Fin (=proof fz           ==[ eqzp₀ ] /
+                           p fz         ==[ eq ⁻¹ ] /
+                           p (fs i)     ==[ eqsp₀ i ⁻¹ ]∎
+                           fs (p₀ i) ∎))
+  πᵢ-inj {p = p} (πᵢ-cnc {p = p₀} R eqzp₀ eqsp₀ πp₀) {fs i} {fs j} eq =
+    =ap fs (πᵢ-inj πp₀ (fs-inj (eqsp₀ i • eq • eqsp₀ j ⁻¹)))
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fz} {fz} eq =
+    =rf
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fz} {fs fz} eq =
+    πᵢ-inj πp₀ (=proof p₀ fz ==[ eqszp₀ ] /
+                      p (fs fz) ==[ eq ⁻¹ ] /
+                      p fz  ==[ eqzp₀ ⁻¹ ]∎
+                      p₀ (fs fz) ∎)
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fz} {fs (fs j)} eq =
+     N₀ind (PA4-Fin (fs-inj (πᵢ-inj πp₀ (=proof p₀ (fs fz)          ==[ eqzp₀ ] /
+                                               p fz                ==[ eq ] /
+                                               p (fs (fs j))       ==[ eqssp₀ j ⁻¹ ]∎
+                                               p₀ (fs (fs j)) ∎))))
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs fz} {fz} eq =
+    πᵢ-inj πp₀ (=proof p₀ (fs fz)   ==[ eqzp₀ ] /
+                      p fz         ==[ eq ⁻¹ ] /
+                      p (fs fz)    ==[ eqszp₀ ⁻¹ ]∎
+                      p₀ fz ∎)
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs (fs i)} {fz} eq =
+    N₀ind (PA4-Fin (fs-inj (πᵢ-inj πp₀ (=proof p₀ (fs fz)          ==[ eqzp₀ ] /
+                                              p fz                ==[ eq ⁻¹ ] /
+                                              p (fs (fs i))       ==[ eqssp₀ i ⁻¹ ]∎
+                                              p₀ (fs (fs i)) ∎))))
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs fz} {fs fz} eq =
+    =rf
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs fz} {fs (fs j)} eq =
+    N₀ind (PA4-Fin (πᵢ-inj πp₀ (=proof p₀ fz          ==[ eqszp₀ ] /
+                                      p (fs fz)                ==[ eq ] /
+                                      p (fs (fs j))       ==[ eqssp₀ j ⁻¹ ]∎
+                                      p₀ (fs (fs j)) ∎)))
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs (fs i)} {fs fz} eq =
+    N₀ind (PA4-Fin (πᵢ-inj πp₀ (=proof p₀ fz          ==[ eqszp₀ ] /
+                                      p (fs fz)                ==[ eq ⁻¹ ] /
+                                      p (fs (fs i))       ==[ eqssp₀ i ⁻¹ ]∎
+                                      p₀ (fs (fs i)) ∎)))
+  πᵢ-inj {p = p} (πᵢ-swp {p = p₀} R S eqzp₀ eqszp₀ eqssp₀ πp₀) {fs (fs i)} {fs (fs j)} eq =
+    πᵢ-inj πp₀ (=proof p₀ (fs (fs i))      ==[ eqssp₀ i ] /
+                      p (fs (fs i))       ==[ eq ] /
+                      p (fs (fs j))       ==[ eqssp₀ j ⁻¹ ]∎
+                      p₀ (fs (fs j)) ∎)
+
 
   -- projections forget variables
+
   π-≤ : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → len Γ' ≤N len Γ
-  π-≤ π-∅                              = 0₁
-  π-≤  {Γ'} {R ∣ Γ} (π-frg R eq πp)     = suc-≤ {len Γ'} {len Γ} (π-≤ πp)
-  -- the expression `suc-≤ (len Γ') (len Γ) (π-≤ πp)` compiles. Why?
-  π-≤ (π-cnc R eqz eqs πp)             = π-≤ πp
-  π-≤ (π-swp R S eqz eqsz eqss πp)     = π-≤ πp
-
-  -- indeed, the underlying function of a projection is injective (!)
-  π-inj : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → ∀ {i j} → p i == p j → i == j
-  π-inj (π-frg R eqs πp) {i} {j} eq =
-    π-inj πp (fs-inj (eqs i • eq • eqs j ⁻¹))
-  -- π-cnc, first term in eq is  p fz = fz
-  π-inj (π-cnc R eqz eqs πp) {fz} {fz} eq =
-    =rf
-  π-inj (π-cnc R eqz eqs πp) {fz} {fs j} eq =
-    N₀ind (PA4-Fin (eqz • eq • eqs j ⁻¹))
-  -- all other variables
-  π-inj (π-cnc R eqz eqs πp) {fs i} {fz} eq =
-    N₀ind (PA4-Fin (eqz • eq ⁻¹ • eqs i ⁻¹))
-  π-inj (π-cnc R eqz eqs πp) {fs i} {fs j} eq =
-    =ap fs (π-inj πp (fs-inj (eqs i • eq • eqs j ⁻¹)))
-  -- π-swp, first term in eq is  p fz = fs fz
-  -- here and below, the second are p fz, p (fs fz) = fz, p (fs (fs j))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fz} eq =
-    =rf
-  π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fs fz} eq =
-    N₀ind (PA4-Fin (eqsz • eq ⁻¹ • eqz ⁻¹))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fz} {fs (fs j)} eq =
-    N₀ind (PA4-Fin (fs-inj (eqz • eq • eqss j ⁻¹)))
-  -- first term in eq is  p (fs fz) = fz
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fz} eq =
-    N₀ind (PA4-Fin (eqsz • eq • eqz ⁻¹))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fs fz} eq =
-    =rf
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs fz} {fs (fs j)} eq =
-    N₀ind (PA4-Fin (eqsz • eq • eqss j ⁻¹))
-  -- all other variables
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fz} eq =
-    N₀ind (PA4-Fin (fs-inj (eqz • eq ⁻¹ • eqss i ⁻¹)))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fs fz} eq =
-    N₀ind (PA4-Fin (eqsz • eq ⁻¹ • eqss i ⁻¹))
-  π-inj (π-swp R S eqz eqsz eqss πp) {fs (fs i)} {fs (fs j)} eq =
-    =ap fs (=ap fs ((π-inj πp (fs-inj (fs-inj (eqss i • eq • eqss j ⁻¹))))))
-
+  π-≤ {[]} {Γ} πp =
+    0₁
+  π-≤ {R ∣ Γ'} {[]} {p} πp =
+    p fz
+  π-≤ {R ∣ Γ'} {S ∣ Γ} {p} πp =
+    Fin-finj-≤ {f = faceFin-restr (p ∘ fs) (p fz) λ _ ps=pz → PA4-Fin (πp ps=pz ⁻¹)}
+               (faceFin-restr-inj {f = p ∘ fs} {p fz} (λ _ ps=pz → PA4-Fin (πp ps=pz ⁻¹))
+                                  (injective-cmp fs-inj πp))
+  
 
   -- only the functions rearranging occurences of types in contexts
   -- in order not to use function extensionality,
   -- constructors are formulated invariant under pointwise equality
   data _≡_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
-    ∅ : ∀ {f} → [] ≡ [] ∶ f
+    ≡∶∅ : ∀ {f} → [] ≡ [] ∶ f
     ≡∶cnc : ∀ {Γ Γ' f f'} R → (fz == f' fz) → (∀ i → fs (f i) == f' (fs i))
                → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ f'
     ≡∶swp : ∀ {Γ Γ' f f'} R S → (fs fz == f' fz) → (fz == f' (fs fz))
                → (∀ i → fs (fs (f i)) == f' (fs (fs i)))
                  → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ f'
 
+  -- what about defining them as the bijections??
+
   ≡∶id : ∀ {Γ} → Γ ≡ Γ ∶ id
-  ≡∶id {[]} = ∅
+  ≡∶id {[]} = ≡∶∅
   ≡∶id {R ∣ Γ} = ≡∶cnc R =rf (λ _ → =rf) ≡∶id
   ≡∶rfl : ∀ {Γ f} → (∀ i → i == f i) → Γ ≡ Γ ∶ f
-  ≡∶rfl {[]} eqf = ∅
+  ≡∶rfl {[]} eqf = ≡∶∅
   ≡∶rfl {R ∣ Γ} eqf = ≡∶cnc R (eqf fz) (λ i → eqf (fs i)) ≡∶id
   ≡∶cnc-rf : ∀ {Γ Γ' f} R → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ (liftFin f)
   ≡∶cnc-rf {Γ'} {Γ} {f} R = ≡∶cnc R =rf (λ _ → =rf)
   ≡∶swp-rf : ∀ {Γ Γ' f} R S → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ (swapFin f)
   ≡∶swp-rf {Γ'} {Γ} {f} R S = ≡∶swp R S =rf =rf (λ _ → =rf)
   ≡∶-= : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
-  ≡∶-= eqf ∅ = ∅
+  ≡∶-= eqf ≡∶∅ = ≡∶∅
   ≡∶-= eqf (≡∶cnc P eqz eqs bij) = ≡∶cnc P (eqz • eqf fz) (λ i → eqs i • eqf (fs i)) bij
   ≡∶-= {f = f} {f'} eqf (≡∶swp {f = g} P Q eqsz eqz eqss bij) =
     ≡∶swp P Q (fs fz                  ==[ eqsz • eqf fz ]              f' fz         )
@@ -244,6 +254,8 @@ module simpleTT (A : Set) where
               (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
               bij
 
+  -- the following three probably provide an equivalence
+  -- between `Γ' ≡ Γ ∶ f` and `len Γ' == len Γ`
   ≡∶-same-len : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → len Γ' == len Γ
   ≡∶-same-len {[]} {[]} {f} ∅ =
     =rf
@@ -251,6 +263,39 @@ module simpleTT (A : Set) where
     =ap suc (≡∶-same-len bij)
   ≡∶-same-len {(R ∣ S ∣ Γ')} {(S ∣ R ∣ Γ)} {f} (≡∶swp R S eqz eqsz eqss bij) =
     =ap (suc ∘ suc) (≡∶-same-len bij)
+
+  -- the bijections are the projections between contexts of the same length
+  ≡∶to◂∶ : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → Γ' ◂ Γ ∶ f
+  ≡∶to◂∶ ≡∶∅ =
+    π-∅
+  ≡∶to◂∶ (≡∶cnc R eqz eqs bij) =
+    π-cnc R eqz eqs (≡∶to◂∶ bij)
+  ≡∶to◂∶ {R ∣ S ∣ Γ} {S ∣ R ∣ Γ'} (≡∶swp {f = f} {f'} R S eqz eqsz eqss bij) =
+    π-swp {Γ = R ∣ S ∣ Γ} {p = liftFin (liftFin f)} R S eqz eqsz eqss
+          (π-cnc {S ∣ Γ'} {S ∣ Γ} R =rf (λ _ → =rf)
+                 (π-cnc S =rf (λ _ → =rf) (≡∶to◂∶ bij)))
+
+  ◂∶to≡∶ : ∀ {Γ Γ' p} → len Γ == len Γ' → Γ' ◂ Γ ∶ p → Γ' ≡ Γ ∶ p
+  ◂∶to≡∶ {[]} {[]} {p} eq πp = ≡∶∅
+  ◂∶to≡∶ {R ∣ Γ} {S ∣ Γ'} {p} eq πp = {!◂∶to≡∶ {p = p'} leneq !}
+    where leneq : len Γ == len Γ'
+          leneq = suc-inj eq
+          p' : Fin (len Γ') → Fin (len Γ)
+          p' = faceFin-restr (p ∘ fs) (p fz) (λ _ ps=pz → PA4-Fin (πp ps=pz ⁻¹))
+
+{-
+  ◂∶to≡∶ eq π-∅ =
+    ∅
+  ◂∶to≡∶ eq (π-frg {Γ'} {Γ} R eqp πp) =
+    N₀ind (suc-non-decr (len Γ) (=transp (λ x → x ≤N len Γ) (eq ⁻¹) (π-≤ πp)))
+  ◂∶to≡∶ eq (π-cnc R eqz eqs πp) =
+    ≡∶cnc R eqz eqs (◂∶to≡∶ (suc-inj eq) πp)
+  ◂∶to≡∶ eq (π-swp R S eqz eqsz eqss πp) =
+    {!!} -- might use composition of projections?
+    -- ≡∶swp R S eqz eqsz eqss (◂∶to≡∶ (suc-inj (suc-inj eq)) πp)
+  -- these two probably form an equivalence of types
+  -- between Γ' ≡ Γ ∶ p and (len Γ == len Γ') × (Γ' ◂ Γ ∶ p)
+-}
 
   ≡∶-cmp : ∀ {Γ Δ Θ f g h} → (∀ i → g (f i) == h i)
              → Γ ≡ Δ ∶ f → Δ ≡ Θ ∶ g → Γ ≡ Θ ∶ h
@@ -278,19 +323,6 @@ module simpleTT (A : Set) where
          (≡∶swp R S eqzf₀ eqszf₀ eqssf₀ qvf₀) (≡∶swp S R eqzg₀ eqszg₀ eqssg₀ qvg) =
     {!!}
 
-  -- the bijections are the projections between contexts of the same length
-  ≡∶to◂∶ : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → Γ' ◂ Γ ∶ f
-  ≡∶to◂∶ ∅ = π-∅
-  ≡∶to◂∶ (≡∶cnc R eqz eqs bij) = π-cnc R eqz eqs (≡∶to◂∶ bij)
-  ≡∶to◂∶ (≡∶swp R S eqz eqsz eqss bij) = π-swp R S eqz eqsz eqss (≡∶to◂∶ bij)
-
-  ◂∶to≡∶ : ∀ {Γ Γ' p} → len Γ == len Γ' → Γ' ◂ Γ ∶ p → Γ' ≡ Γ ∶ p
-  ◂∶to≡∶ eq π-∅ = ∅
-  ◂∶to≡∶ eq (π-frg {Γ'} {Γ} R eqp πp) = N₀ind (suc-non-decr (len Γ) (=transp (λ x → x ≤N len Γ) (eq ⁻¹) (π-≤ πp)))
-  ◂∶to≡∶ eq (π-cnc R eqz eqs πp) = ≡∶cnc R eqz eqs (◂∶to≡∶ (suc-inj eq) πp)
-  ◂∶to≡∶ eq (π-swp R S eqz eqsz eqss πp) = ≡∶swp R S eqz eqsz eqss (◂∶to≡∶ (suc-inj (suc-inj eq)) πp)
-  -- these two probably form an equivalence of types
-  -- between Γ' ≡ Γ ∶ p and (len Γ == len Γ') × (Γ' ◂ Γ ∶ p)
 
   ∋v∶-= : ∀ {Γ T x x'} → x == x' → Γ ∋ x ∶ T → Γ ∋ x' ∶ T
   ∋v∶-= {Γ} {T} = =transp (λ x → Γ ∋ x ∶ T)
@@ -333,18 +365,15 @@ module simpleTT (A : Set) where
 
   -- three useful properties of projections
   π-= : ∀ {Γ Γ' p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
-  π-= eqp π-∅ = π-∅
-  π-= eqp (π-frg R eq πp) = π-frg R (λ i → eq i • eqp i) πp
-  π-= eqp (π-cnc R eqz eqs πp) = π-cnc R (eqz • eqp fz) (λ i → eqs i • eqp (fs i)) πp
-  π-= eqp (π-swp R S eqz eqsz eqss πp) = π-swp R S (eqz • eqp fz)
-                                                   (eqsz • eqp (fs fz))
-                                                   (λ i → eqss i • eqp (fs (fs i)))
-                                                   πp
+  π-= eqp πp {i} {j} eq = πp (eqp i • eq • eqp j ⁻¹)
 
   -- if T occurs in the i-th position in Γ' and Γ' ◂ Γ ∶ f,
   -- then T occurs in the (f i)-th position in Γ
   π-∋∶ : ∀ {Γ Γ' p} → Γ' ◂ Γ ∶ p → ∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T
-  π-∋∶ (π-frg R eq πp) here =
+  π-∋∶ {Γ} {Γ'} {p} πp {i} {T} inc = {!!}
+
+{-
+(π-frg R eq πp) here =
     ∋v∶-= (eq fz) (there (π-∋∶ πp here)) 
   π-∋∶ (π-frg R eq πp) {i} (there inc) =
     ∋v∶-= (eq i) (there (π-∋∶ πp (there inc)))
@@ -358,11 +387,15 @@ module simpleTT (A : Set) where
     ∋v∶-= eqsz here
   π-∋∶ (π-swp R S eqz eqsz eqss πp) {fs (fs i)} (there (there inc)) =
     ∋v∶-= (eqss i) (there (there (π-∋∶ πp inc)))
+-}
 
   -- used only to prove `←to◂`, which is not used anywhere
   π-∋∶-inv : ∀ {Γ Γ' p} → (∀ {i j} → p i == p j → i == j)
                → (∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T) → Γ' ◂ Γ ∶ p
-  π-∋∶-inv {[]} {[]} inj pf =
+  π-∋∶-inv = {!!}
+
+{-
+{[]} {[]} inj pf =
     π-∅
   π-∋∶-inv {R ∣ Γ} {[]} inj pf =
     π-frg {p = N₀ind} R N₀ind
@@ -387,6 +420,7 @@ module simpleTT (A : Set) where
           eq₀ = {!!}
           pp₀ : Γ' ◂ Θ ∶ p₀
           pp₀ = {!!}
+-}
 
 
   ---------------------------
@@ -399,7 +433,7 @@ module simpleTT (A : Set) where
   wkn-π πp (⊢-app der₁ der₂) = ⊢-app (wkn-π πp der₁) (wkn-π πp der₂)
 
   wkn-0 : ∀ {Γ M T} R → Γ ⊢ M ∶ T → R ∣ Γ ⊢ (ext M) ∶ T
-  wkn-0 R der = wkn-π π-dsp der
+  wkn-0 R der = wkn-π (π-dsp R) der
 
 
   -----------------------
@@ -450,7 +484,10 @@ module simpleTT (A : Set) where
 
   -- projections are substitutions
   ◂to← : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i) → Γ ◂ Γ' ∶ p → Γ ← Γ' ∶ s
-  ◂to← eq π-∅ =
+  ◂to← = {!!}
+
+{-
+eq π-∅ =
     σ-!
   ◂to← eq (π-frg R eqs πp) =
     σ-frg R (λ i → =ap var (eqs i) • eq i) (◂to← (λ _ → =rf) πp)
@@ -464,13 +501,13 @@ module simpleTT (A : Set) where
                      (σ-frg S (λ _ → =rf)
                      (◂to← (λ _ → =rf) πp)))
           (⊢-var (there here))
-
+-}
 
   σ-id : ∀ {Γ} → Γ ← Γ ∶ var
-  σ-id {Γ} = ◂to← (λ i → =rf) π-id
+  σ-id {Γ} = ◂to← (λ i → =rf) (π-id (λ _ → =rf))
 
   σ-rfl : ∀ {Γ s} → (∀ i → var i == s i) → Γ ← Γ ∶ s
-  σ-rfl {Γ} eq = ◂to← eq (π-rfl (λ _ → =rf))
+  σ-rfl {Γ} eq = ◂to← eq (π-id (λ _ → =rf))
 
   ←∶v-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {i j} → s i == var j → Γ' ∋ j ∶ pr Γ i
   ←∶v-∋∶ σs {i} eq = ⊢∶-∋∶ (σ-∋∶' σs i) eq
@@ -547,42 +584,6 @@ module simpleTT (A : Set) where
           stp' : app M N ⟶ subst-0 M' N
           stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
 
-  ---------------------------
-  -- reducibility candidates
-  ---------------------------
-{-
-  -- the straightforward inductive definition of `red-cand` is NOT strictly positive
-  data red-cand {n} (M : Trm n) : (T : Ty) → Set where
-    rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
-    rc-⇒ : ∀ {T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S)
-                   → red-cand M (T ⇒ S)
--}
-  -- so define it by recursion into `Set`
-  red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
-  red-cand {n} M (atm a) = isStrNrm M
-  red-cand {n} M (T ⇒ S) = ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
-  -- the second clause quantifies over all `k` and `N : Trm (k +N n)`
-  -- as I am not able to prove that red-cand is invariant under weakening otherwise.
---red-cand {n} M (T ⇒ S) = ∀ {N} → red-cand N T → red-cand (app M N) S
-
-  -- quite useless functions
-  rc-atm : ∀ {n M} {a : A} → isStrNrm {n} M → red-cand M (atm a)
-  rc-atm nrm = nrm
-  rc-⇒ : ∀ {n M T S} → (∀ k {N} → red-cand N T → red-cand (app (ext[ k ] {n} M) N) S)
-              → red-cand M (T ⇒ S)
-  rc-⇒ rcapp = rcapp
-  rc-ind : (C : ∀ {n M T} → red-cand {n} M T → Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C (rc-atm {a = a} nrm))
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C {T = T ⇒ S} (rc-⇒ fnc))
-                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
-  rc-ind C Catm Cfnc {T = atm a} = Catm {a = a}
-  rc-ind C Catm Cfnc {T = T ⇒ S} = Cfnc
-  rc-rec : (C : Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C)
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C)
-                → ∀ {n M T} → (rc : red-cand {n} M T) → C
-  rc-rec C = rc-ind (λ _ → C)
-
 
   ------------------
   -- neutral terms
@@ -610,6 +611,44 @@ module simpleTT (A : Set) where
   neutral-extk : ∀ k {n M} → is-neutral {n} M → is-neutral (ext[ k ] M)
   neutral-extk zero = id
   neutral-extk (suc k) = neutral-ext ∘ neutral-extk k
+
+
+  ---------------------------
+  -- reducibility candidates
+  ---------------------------
+{-
+  -- the following inductive definition of `red-cand` is NOT strictly positive
+
+  data red-cand {n} (M : Trm n) : (T : Ty) → Set where
+    rc-atm : ∀ {a} → isStrNrm {n} M → red-cand M (atm a)
+    rc-⇒ : ∀ {T S} → (∀ {N} → red-cand {n} N T → red-cand (app M N) S)
+                   → red-cand M (T ⇒ S)
+
+  -- so define it by recursion into `Set`
+-}
+  red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
+  red-cand {n} M (atm a) = isStrNrm M
+  red-cand {n} M (T ⇒ S) = ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
+  -- the second clause quantifies over all `k` and `N : Trm (k +N n)`
+  -- as I am not able to prove that red-cand is invariant under weakening otherwise
+
+  -- quite useless functions
+  rc-atm : ∀ {n M} {a : A} → isStrNrm {n} M → red-cand M (atm a)
+  rc-atm nrm = nrm
+  rc-⇒ : ∀ {n M T S} → (∀ k {N} → red-cand N T → red-cand (app (ext[ k ] {n} M) N) S)
+              → red-cand M (T ⇒ S)
+  rc-⇒ rcapp = rcapp
+  rc-ind : (C : ∀ {n M T} → red-cand {n} M T → Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C (rc-atm {a = a} nrm))
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C {T = T ⇒ S} (rc-⇒ fnc))
+                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
+  rc-ind C Catm Cfnc {T = atm a} = Catm {a = a}
+  rc-ind C Catm Cfnc {T = T ⇒ S} = Cfnc
+  rc-rec : (C : Set)
+              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C)
+              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C)
+                → ∀ {n M T} → (rc : red-cand {n} M T) → C
+  rc-rec C = rc-ind (λ _ → C)
 
 
   -- the three main properties of reducibility candidates
