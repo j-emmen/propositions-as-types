@@ -901,8 +901,7 @@ module Nat-and-Fin where
   faceFin-idfull i = inj-set-is-idfull (Fin-isSet _) (faceFin-inj i)
 
   faceFin-img : ∀ {n} (i : Fin (suc n))
-                → ∀ {j} → ¬ (j == i)
-                  → Σ[ Fin n ] (λ x → faceFin-fun i x == j)
+                → ∀ {j} → ¬ (j == i) → fib (faceFin-fun i) j
   faceFin-img {zero} i {j} j≠i =                N₀ind (j≠i (N₁-isProp j i))
   faceFin-img {suc n} fz {j} j≠z =              Fin-dicotfs j (λ x → j≠z (x ⁻¹))
   faceFin-img {suc n} (fs i) {fz} z≠si =        fz ,, =rf
@@ -988,11 +987,11 @@ module Nat-and-Fin where
   
   -- induction with arbitrary base case using the face map
 
-  Fin-ind-face :  ∀ {n} {C : Fin (suc n) → Set} (i : Fin (suc n))
+  faceFin-ind :  ∀ {n} {C : Fin (suc n) → Set} (i : Fin (suc n))
                    → (cel : C i) → (cfun : ∀ x → C (faceFin-fun i x))
                      → Σ[ (∀ j → C j) ] ( λ x →
                          (x i == cel) × (∀ j → x (faceFin-fun i j)== cfun j) )
-  Fin-ind-face {n} {C} i cel cfun =
+  faceFin-ind {n} {C} i cel cfun =
     fst
     ,, (sndel , sndfc)
     where module i = splt+N-Fin i
@@ -1161,7 +1160,33 @@ module Nat-and-Fin where
     ] (faceFin-dicot i j)
 
 
+  -- an injective function between finite sets of the same length is also surjective
 
+  Fin-pdghl : ∀ {n m} {f : Fin n → Fin m} → n == m → is-injective f → is-surjective f
+  Fin-pdghl {n} {zero} {f} z=m finj j =
+    N₀rec j
+  Fin-pdghl {suc n} {suc m} {f} sn=sm finj =
+    pj1 (faceFin-ind (f fz) (fz ,, =rf) ≠ffz)
+    where ih : is-surjective (faceFin-restrinj f finj fz)
+          ih = Fin-pdghl (suc-inj sn=sm) (faceFin-restrinj-inj finj fz)
+          ≠ffz : ∀ j → fib f (faceFin-fun (f fz) j)
+          ≠ffz j = fs (pj1 (ih j))
+                   ,, (=proof
+            f (fs (pj1 (ih j)))             ==[ faceFin-restrinj-tr finj fz _ ⁻¹ ] /
+            faceFin-fun (f fz) (faceFin-restrinj f finj fz (pj1 (ih j)))
+                                            ==[ =ap (faceFin-fun (f fz)) (pj2 (ih j)) ]∎
+            faceFin-fun (f fz) j ∎)
+
+
+
+
+{-
+  Fin-pdghl {zero} {m} {f} z=m finj = λ b → N₀rec ((Fin ● z=m ⁻¹) b)
+  Fin-pdghl {suc n} {m} {f} sn=m finj b =
+    [ (λ eq → fz ,, eq)
+    ∣ (λ ne → {!faceFin-restr!})
+    ] (Fin-is-decid (f fz) b)
+-}
 
 --   liftFin-any :  ∀ {n m} → (f : Fin n → Fin m) (i : Fin (suc n)) (j : Fin (suc m))
 --                    → Σ[ (Fin (suc n) → Fin (suc m)) ] (λ x → (x i == j) × (∀ y → (x ∘ faceFin-fun i) y == (faceFin-fun j ∘ f) y))

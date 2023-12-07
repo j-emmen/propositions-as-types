@@ -1041,6 +1041,7 @@ module Identity where
   is-equiv-is-Prop {A} {B} {f} = ∀-is-prop (λ b → isContr (fib f b))
                                            (λ b → isContr-is-prop (fib f b))
 
+
   is-iso-pair : ∀ {A B} → (f : A → B) → (g : B → A) → Set
   is-iso-pair f g = (∀ a → g (f a) == a) × (∀ b → f (g b) == b)
   is-adj-iso-pair : ∀ {A B} → (f : A → B) → (g : B → A) → Set
@@ -1053,6 +1054,19 @@ module Identity where
   is-adj-invrt {A} {B} f = Σ[ (B → A) ] (is-adj-iso-pair f)
   is-idfull : ∀ {A B} (f : A → B) → Set
   is-idfull f = ∀ {a a'} (p : f a == f a') → Σ[ a == a' ] (λ x → =ap f x == p)
+
+  id-is-invrt : ∀ {A} → is-invrt (id {A})
+  id-is-invrt {A} = id ,, ((λ _ → =rf) , (λ _ → =rf))
+  =id-is-invrt : ∀ {A} {f : A → A} → (∀ a → f a == a) → is-invrt f
+  =id-is-invrt =id = id ,, (=id , =id)
+  =invrt-is-invrt : ∀ {A B} {f g : A → B} → (∀ a → f a == g a) → is-invrt g → is-invrt f
+  =invrt-is-invrt {A} {B} {f} {g} pf ginv = pj1 ginv ,, ((λ a → =ap (pj1 ginv) (pf a) • prj1 (pj2 ginv) a)
+                                                         , λ b → pf _ • prj2 (pj2 ginv) b)
+
+  =transp-is-invrt : {A : Set}(B : A → Set){a a' : A} (p : a == a')
+                        → is-invrt (B ● p)
+  =transp-is-invrt {A} B p =
+    B ● (p ⁻¹) ,, (=transp-forth-back-ptw B p , =transp-back-forth-ptw B p)
 
   idfull-fib-is-prop : ∀ {A B} {f : A → B} → is-idfull f
                          → ∀ b → isProp (fib f b)
@@ -1072,12 +1086,6 @@ module Identity where
               (pj2 z' ⁻¹) ⁻¹ • pj2 z ⁻¹ • pj2 z
                                         ==[ •idrg-inv (•invl (pj2 z)) (⁻¹⁻¹=id (pj2 z')) ]∎
               pj2 z' ∎
-
-  =transp-is-invrt : {A : Set}(B : A → Set){a a' : A} (p : a == a')
-                        → is-invrt (B ● p)
-  =transp-is-invrt {A} B p =
-    B ● (p ⁻¹) ,, (=transp-forth-back-ptw B p , =transp-back-forth-ptw B p)
-
   
 
   ∘is-invrt : ∀ {A B C} {f : A → B}{g : B → C}
@@ -1660,10 +1668,12 @@ module Identity where
   inj-set-is-idfull : ∀ {A B} {f : A → B} → isSet B → is-injective f → is-idfull f
   inj-set-is-idfull {A} {B} {f} Bset finj fa=fa' = finj fa=fa' ,, Bset (=ap f (finj fa=fa')) fa=fa'
 
+  injective-ext : ∀ {A B} {f g : A → B} → (∀ x → f x == g x)
+                     → is-injective f → is-injective g
+  injective-ext eq finj {a} {a'} e = finj (eq a • e • eq a' ⁻¹)
   injective-cmp : {A B C : Set} {f : A → B} {g : B → C}
                      → is-injective f → is-injective g → is-injective (g ∘ f)
   injective-cmp finj ginj = finj ∘ ginj
-
   injective-tr : {A B C : Set} {f : A → B} {g : B → C} {h : A → C}
                      → (∀ {a} → g (f a) == h a) → is-injective h
                           → is-injective f
@@ -1674,5 +1684,33 @@ module Identity where
                  h a' ∎)
   invrt-is-injective : ∀ {A B} {f : A → B} → is-invrt f → is-injective f
   invrt-is-injective {A} {B} {f} finv eq = prj1 (pj2 finv) _ ⁻¹ • =ap (pj1 finv) eq • prj1 (pj2 finv) _
+  isid-is-injective : ∀ {A} {f : A → A} → (∀ x → f x == x) → is-injective f
+  isid-is-injective isid {a} {a'} e = isid a ⁻¹ • e • isid a'
+
+  is-surjective :  {A B : Set} → (A → B) → Set
+  is-surjective f = ∀ b → fib f b
+
+  surjective-cmp : {A B C : Set} {f : A → B} {g : B → C}
+                     → is-surjective f → is-surjective g → is-surjective (g ∘ f)
+  surjective-cmp {A} {B} {C} {f} {g} fsj gsj c =
+    pj1 (fsj b)
+    ,, =ap g (pj2 (fsj b)) • pj2 (gsj c)
+    where b : B
+          b = pj1 (gsj c)
+  surjective-tr : {A B C : Set} {f : A → B} {g : B → C} {h : A → C}
+                     → (∀ {a} → g (f a) == h a) → is-surjective h
+                          → is-surjective g
+  surjective-tr {A} {B} {C} {f} {g} {h} tr hsj c =
+    f a
+    ,, tr • pj2 (hsj c)
+    where a : A
+          a = pj1 (hsj c)
+  invrt-is-surjective : ∀ {A B} {f : A → B} → is-invrt f → is-surjective f
+  invrt-is-surjective {A} {B} {f} finv b =
+    g b
+    ,, prj2 (pj2 finv) b
+    where g : B → A
+          g = pj1 finv
+
 
 -- end of file
