@@ -64,6 +64,11 @@ module simpleTT (A : Set) where
   ⊢∶-∋∶ : ∀ {Γ T M} → Γ ⊢ M ∶ T → ∀ {i} → M == var i → Γ ∋ i ∶ T
   ⊢∶-∋∶ der eq = ⊢v∶-∋∶ (⊢∶-= eq der)
 
+  -- the only values of function types are lambdas
+  ⊢-val-is-lam : ∀ {Γ T S M} → Γ ⊢ M ∶ T ⇒ S → is-value M
+                   → Σ[ Trm (suc (len Γ)) ] (λ x → lam x == M)
+  ⊢-val-is-lam der (val-lam {M'} nrm') = M' ,, =rf
+
   -- context morphisms
   isCtxMor : ∀ Γ Γ' → (f : Fin (len Γ) → Fin (len Γ')) → Set
   isCtxMor Γ Γ' f = ∀ {T i} → Γ ∋ i ∶ T → Γ' ∋ (f i) ∶ T
@@ -80,10 +85,19 @@ module simpleTT (A : Set) where
   !-CtxMor Γ p {_} {i} _ = N₀rec i
   CtxMor-cmp-rf : ∀ {Γ Δ Θ p q} → isCtxMor Γ Δ p → isCtxMor Δ Θ q → isCtxMor Γ Θ (q ∘ p)
   CtxMor-cmp-rf pcm qcm {T} {i} = qcm ∘ pcm
-  CtxMor-cmp : ∀ {Γ Δ Θ p q r} → (∀ i → q (p i) == r i)
+  CtxMor-cmp : ∀ {Γ Δ Θ p q r} → (∀ i → r i == q (p i))
                  → isCtxMor Γ Δ p → isCtxMor Δ Θ q → isCtxMor Γ Θ r
-  CtxMor-cmp tr pcm qcm {T} {i} = CtxMor-ext tr (qcm ∘ pcm)
-  
+  CtxMor-cmp tr pcm qcm {T} {i} = CtxMor-ext (λ i → tr i ⁻¹) (qcm ∘ pcm)
+  fs-cm :  ∀ {Γ R} → isCtxMor Γ (R ∣ Γ) fs
+  fs-cm {Γ} {R} = there
+  liftFinCtxMor : ∀ {Γ Δ} R {f} → isCtxMor Γ Δ f → isCtxMor (R ∣ Γ) (R ∣ Δ) (liftFin f)
+  liftFinCtxMor R cm {R} {fz} here = here
+  liftFinCtxMor R cm {T} {fs i} (there inc) = there (cm inc)
+  swapFinCtxMor : ∀ {Γ' Γ p } R S → isCtxMor (R ∣ S ∣ Γ') Γ p → isCtxMor (S ∣ R ∣ Γ') Γ (p ∘ swapFin id)
+  swapFinCtxMor R S cm {S} here = cm (there here)
+  swapFinCtxMor R S cm {R} (there here) = cm here
+  swapFinCtxMor R S cm {T} (there (there inc)) = cm (there (there inc))
+    
   
   -- the context projections are those context morphisms whose function is injective 
   infix 10 _◂_∶_
@@ -111,11 +125,14 @@ module simpleTT (A : Set) where
   π-ext eq πp = injective-ext eq (◂∶ij πp)
                 , CtxMor-ext eq (◂∶cm πp)
   π-frg-rf : ∀ {Γ' Γ p} R → R ∣ Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ (p ∘ fs)
-  π-frg-rf R πp = (fs-inj ∘ prj1 πp) , {!!}
+  π-frg-rf R πp = (fs-inj ∘ prj1 πp)
+                  , CtxMor-cmp-rf fs-cm (◂∶cm πp)
   π-cnc-rf : ∀ {Γ' Γ p } R → Γ' ◂ Γ ∶ p → (R ∣ Γ') ◂ (R ∣ Γ) ∶ (liftFin p)
-  π-cnc-rf R πp = liftFin-inj (prj1 πp) , {!!}
+  π-cnc-rf R πp = liftFin-inj (prj1 πp)
+               , liftFinCtxMor R (◂∶cm πp)
   π-swp-rf : ∀ {Γ' Γ p } R S → R ∣ S ∣ Γ' ◂ Γ ∶ p → S ∣ R ∣ Γ' ◂ Γ ∶ (p ∘ swapFin id)
-  π-swp-rf R S πp = (λ e → swapFin-inj id (prj1 πp e)) , {!!}
+  π-swp-rf R S πp = (λ e → swapFin-inj id (prj1 πp e))
+                    , swapFinCtxMor R S (◂∶cm πp)
   π-cmp : ∀ {Γ Δ Θ p q r} → (∀ i → q (p i) == r i)
              → Γ ◂ Δ ∶ p → Δ ◂ Θ ∶ q → Γ ◂ Θ ∶ r
   π-cmp tr πp πq = π-ext tr (π-cmp-rf πp πq)
@@ -123,7 +140,7 @@ module simpleTT (A : Set) where
              → R ∣ Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
   π-frg R eq πp =
     π-ext eq (π-frg-rf R πp)
-  π-cnc : ∀ {Γ' Γ p p'} R → fz == p' fz → (∀ i → fs (p i) == p' (fs i))
+  {-π-cnc : ∀ {Γ' Γ p p'} R → fz == p' fz → (∀ i → fs (p i) == p' (fs i))
                 → Γ' ◂ Γ ∶ p → (R ∣ Γ') ◂ (R ∣ Γ) ∶ p'
   π-cnc R eqz eqs πp =
     π-ext {R ∣ _} {R ∣ _} (liftFin-ptw eqz eqs) (π-cnc-rf R πp)
@@ -131,10 +148,9 @@ module simpleTT (A : Set) where
              → (∀ i → p (fs (fs i)) == p' (fs (fs i)))
                    → R ∣ S ∣ Γ' ◂ Γ ∶ p → S ∣ R ∣ Γ' ◂ Γ ∶ p'
   π-swp {p = p} R S eqz eqsz eqss πp =
-    π-ext {S ∣ R ∣ _} (swapFin-pcmp {f = p} eqz eqsz eqss) (π-swp-rf R S πp)
+    π-ext {S ∣ R ∣ _} (swapFin-pcmp {f = p} eqz eqsz eqss) (π-swp-rf R S πp)-}
 
   -- projections forget variables
-
   π-≤ : ∀ {Γ' Γ p} → Γ' ◂ Γ ∶ p → len Γ' ≤N len Γ
   π-≤ {[]} {Γ} πp =
     0₁
@@ -146,6 +162,75 @@ module simpleTT (A : Set) where
                                   (injective-cmp fs-inj (prj1 πp)))
 
 
+  -- the context bijections are bijections and context morphisms (i.e. preserve the typing of variables)
+
+  infix 2 _≡_∶_
+  _≡_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set
+  Γ ≡ Γ' ∶ f = is-invrt f × isCtxMor Γ Γ' f
+  ≡∶iv : ∀ {Γ Γ' f} → Γ ≡ Γ' ∶ f → is-invrt f
+  ≡∶iv = prj1
+  ≡∶cm : ∀ {Γ Γ' f} → Γ ≡ Γ' ∶ f → isCtxMor Γ Γ' f
+  ≡∶cm = prj2
+
+  ≡∶ext : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
+  ≡∶ext {Γ} {Γ'} {f} {f'} eq bj = =invrt-is-invrt (λ i → eq i ⁻¹) (≡∶iv bj)
+                                  , λ {T i} inc → ((λ x → Γ ∋ x ∶ T) ● eq i) (≡∶cm bj inc)
+  ≡∶id : ∀ {Γ} → Γ ≡ Γ ∶ id
+  ≡∶id {Γ} = id-is-invrt {Fin (len Γ)}
+             , id
+  ≡∶rfl : ∀ {Γ f} → (∀ i → i == f i) → Γ ≡ Γ ∶ f
+  ≡∶rfl =id = ≡∶ext =id ≡∶id
+  ≡∶cmp : ∀ {Γ Δ Θ f g h} → (∀ i → h i == g (f i))
+             → Γ ≡ Δ ∶ f → Δ ≡ Θ ∶ g → Γ ≡ Θ ∶ h
+  ≡∶cmp {Γ} {Δ} {Θ} {f} {g} {h} tr fbj gbj = invrt-cmp tr (≡∶iv fbj) (≡∶iv gbj)
+                                             , CtxMor-cmp tr (≡∶cm fbj) (≡∶cm gbj)
+  ≡∶cnc-rf : ∀ {Γ Γ' f} R → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ (liftFin f)
+  ≡∶cnc-rf {Γ'} {Γ} {f} R  bj = liftFin-invrt (≡∶iv bj)
+                                , liftFinCtxMor R (≡∶cm bj)
+  ≡∶swp-rf : ∀ {Γ' Γ p } R S → R ∣ S ∣ Γ' ≡ Γ ∶ p → S ∣ R ∣ Γ' ≡ Γ ∶ (p ∘ swapFin id)
+  ≡∶swp-rf R S bj = invrt-cmp-rf (swapFin-invrt id-is-invrt) (≡∶iv bj)
+                    , swapFinCtxMor R S (≡∶cm bj)
+  
+  -- the bijections are the projections between contexts of the same length
+  -- (the following three probably provide an equivalence
+  -- between `Γ' ≡ Γ ∶ f` and `len Γ' == len Γ` × Γ' ◂ Γ ∶ f)
+  ≡∶-same-len : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → len Γ' == len Γ
+  ≡∶-same-len bj = Fin-invrt-=len (≡∶iv bj)
+  ≡∶to◂∶ : ∀ {Γ Γ' f} → Γ' ≡ Γ ∶ f → Γ' ◂ Γ ∶ f
+  ≡∶to◂∶ {Γ} {Γ'} {f} bj = invrt-is-injective (≡∶iv bj)
+                            , ≡∶cm bj
+  ◂∶to≡∶ : ∀ {Γ Γ' p} → len Γ' == len Γ → Γ' ◂ Γ ∶ p → Γ' ≡ Γ ∶ p
+  ◂∶to≡∶ {Γ} {Γ'} {p} eq πp = inj+surj-is-invrt (◂∶ij πp) (Fin-pgnhl eq (◂∶ij πp))
+                               , ◂∶cm πp
+
+
+  -- the order of premises in a derivation does not matter,
+  -- up to renaming the variables accordingly
+  ≡∶-⊢ : ∀ {Γ Γ' f M T} → Γ' ≡ Γ ∶ f
+                → Γ' ⊢ M ∶ T → Γ ⊢ rename M f ∶ T
+  ≡∶-⊢ bij (⊢-var inc) = ⊢-var (≡∶cm bij inc)
+  ≡∶-⊢ bij (⊢-abs {T = T} der) = ⊢-abs (≡∶-⊢ (≡∶cnc-rf T bij) der)
+  ≡∶-⊢ bij (⊢-app der₁ der₂) = ⊢-app (≡∶-⊢ bij der₁) (≡∶-⊢ bij der₂)
+
+
+  -- if a type occurs in a context, WLOG it occurs in the first position
+  ≡∶-mv-fst : ∀ {Γ T i} → Γ ∋ i ∶ T
+               → Σ[ Ctx ] (λ x →
+                   Σ[ (Fin (suc (len x)) → Fin (len Γ)) ] ((T ∣ x) ≡ Γ ∶_))
+  ≡∶-mv-fst {T ∣ Γ} {T} {fz} here =
+    Γ
+    ,, id
+    ,, ≡∶id
+  ≡∶-mv-fst {R ∣ Γ} {T} {fs i} (there inc) =
+    (R ∣ pj1 ih)
+    ,, ( liftFin (pj1 (pj2 ih)) ∘ swapFin id )
+    ,, ≡∶swp-rf {p = liftFin (pj1 (pj2 ih))} R T (≡∶cnc-rf R (pj2 (pj2 ih)))
+    where ih : Σ[ Ctx ] (λ x →
+                   Σ[ (Fin (suc (len x)) → Fin (len Γ)) ] ((T ∣ x) ≡ Γ ∶_))
+          ih = ≡∶-mv-fst inc
+
+
+{-
   -- inductive attempt
   infix 10 _◂ᵢ_∶_
   data _◂ᵢ_∶_ : (Γ' Γ : Ctx) → (Fin (len Γ') → Fin (len Γ)) → Set where
@@ -250,35 +335,6 @@ module simpleTT (A : Set) where
                       p₀ (fs (fs j)) ∎)
 
 
-  -- the context bijections are bijections and context morphisms (i.e. preserve the typing of variables)
-
-  infix 2 _≡_∶_
-  _≡_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set
-  Γ ≡ Γ' ∶ f = is-invrt f × isCtxMor Γ Γ' f
-  ≡∶iv : ∀ {Γ Γ' f} → Γ ≡ Γ' ∶ f → is-invrt f
-  ≡∶iv = prj1
-  ≡∶cm : ∀ {Γ Γ' f} → Γ ≡ Γ' ∶ f → isCtxMor Γ Γ' f
-  ≡∶cm = prj2
-
-  ≡∶ext : ∀ {Γ Γ' f f'} → (∀ i → f i == f' i) → Γ' ≡ Γ ∶ f → Γ' ≡ Γ ∶ f'
-  ≡∶ext {Γ} {Γ'} {f} {f'} eq bj =
-    =invrt-is-invrt (λ i → eq i ⁻¹) (≡∶iv bj)
-    , λ {T i} inc → ((λ x → Γ ∋ x ∶ T) ● eq i) (≡∶cm bj inc)
-  ≡∶id : ∀ {Γ} → Γ ≡ Γ ∶ id
-  ≡∶id {Γ} = id-is-invrt {Fin (len Γ)} , id
-  ≡∶rfl : ∀ {Γ f} → (∀ i → i == f i) → Γ ≡ Γ ∶ f
-  ≡∶rfl =id = ≡∶ext =id ≡∶id
-  ≡∶cnc-rf : ∀ {Γ Γ' f} R → Γ' ≡ Γ ∶ f → (R ∣ Γ') ≡ (R ∣ Γ) ∶ (liftFin f)
-  ≡∶cnc-rf {Γ'} {Γ} {f} R = {!!}
-  ≡∶swp-rf : ∀ {Γ Γ' f} R S → Γ' ≡ Γ ∶ f → (S ∣ R ∣ Γ') ≡ (R ∣ S ∣ Γ) ∶ (swapFin f)
-  ≡∶swp-rf {Γ'} {Γ} {f} R S = {!!}
-  
-  -- if T occurs in the i-th position in Γ' and Γ' ≡ᵢ Γ ∶ f,
-  -- then T occurs in the (f i)-th position in Γ
-  ≡∶-∋∶ : ∀ {Γ Γ' f T} → Γ' ≡ Γ ∶ f → ∀ {i} → Γ' ∋ i ∶ T → Γ ∋ (f i) ∶ T
-  ≡∶-∋∶ {T = T} bj = prj2 bj {T}
-
-
   -- inductive version
   data _≡ᵢ_∶_ : (Γ Γ' : Ctx) → (Fin (len Γ) → Fin (len Γ')) → Set where
     ≡ᵢ∶∅ : ∀ {f} → [] ≡ᵢ [] ∶ f
@@ -306,6 +362,7 @@ module simpleTT (A : Set) where
               (fz                     ==[ eqz • eqf (fs fz) ]          f' (fs fz)    )
               (λ i → fs (fs (g i))   ==[ eqss i • eqf (fs (fs i)) ]   f' (fs (fs i)))
               bij
+
 
   -- the following three probably provide an equivalence
   -- between `Γ' ≡ᵢ Γ ∶ f` and `len Γ' == len Γ`
@@ -395,6 +452,7 @@ module simpleTT (A : Set) where
   ≡ᵢ∶-∋∶ (≡ᵢ∶swp R S eqz eqsz eqss bij) {fs (fs i)} (there (there inc)) =
     ∋v∶-= (eqss i) (there (there (≡ᵢ∶-∋∶ bij inc)))
 
+
   -- the order of premises in a derivation does not matter,
   -- up to renaming the variables accordingly
   ≡ᵢ∶-congr-⊢ : ∀ {Γ Γ' f M T} → Γ' ≡ᵢ Γ ∶ f
@@ -415,6 +473,7 @@ module simpleTT (A : Set) where
     (R ∣ pj1 (≡ᵢ∶-occur pf))
     ,, ( (liftFin (pj1 (pj2 (≡ᵢ∶-occur pf))) ∘ swapFin id)
     ,, {!≡ᵢ∶cnc-rf R (pj2 (pj2 (≡ᵢ∶-occur pf)))!} )
+
 
   -- three useful properties of projections
   π-= : ∀ {Γ Γ' p p'} → (∀ i → p i == p' i) → Γ' ◂ Γ ∶ p → Γ' ◂ Γ ∶ p'
@@ -447,32 +506,6 @@ module simpleTT (A : Set) where
                → (∀ {i T} → Γ' ∋ i ∶ T → Γ ∋ (p i) ∶ T) → Γ' ◂ Γ ∶ p
   π-∋∶-inv = {!!}
 
-{-
-{[]} {[]} inj pf =
-    π-∅
-  π-∋∶-inv {R ∣ Γ} {[]} inj pf =
-    π-frg {p = N₀ind} R N₀ind
-          (π-∋∶-inv (λ {i} {j} _ → N₀ind {λ _ → i == j} i)
-                    (λ {x} {_} → N₀ind {λ _ → ([] ∋ x ∶ _ → Γ ∋ N₀ind x ∶ _)} x))
-  π-∋∶-inv {[]} {R' ∣ Γ'} {p} inj pf =
-    N₀ind {λ _ → R' ∣ Γ' ◂ [] ∶ p} (p fz)
-  π-∋∶-inv {R ∣ Γ} {R' ∣ Γ'} {p} inj pf = {!!}
-    where -- note that `p fz` is an occurrence of `R'` in `R ∣ Γ` by `pf`, that is
-          Θ : Ctx
-          Θ = pj1 (≡ᵢ∶-occur (pf here))
-          f : Fin (suc (len Θ)) → Fin (suc (len Γ))
-          f = pj1 (pj2 (≡ᵢ∶-occur (pf here)))
-          fbij : (R' ∣ Θ) ≡ᵢ (R ∣ Γ) ∶ f
-          fbij = pj2 (pj2 (≡ᵢ∶-occur (pf here)))
-          lΘ : len Θ == len Γ
-          lΘ = suc-inj (≡ᵢ∶-same-len fbij)
-          -- then `p (fs i)` is in `Θ` for every `i`, that is
-          p₀ : Fin (len Γ') → Fin (len Θ)
-          p₀ = {!!}
-          eq₀ : ∀ {i} → fs (Fin-=to→ lΘ (p₀ i)) == p (fs i)
-          eq₀ = {!!}
-          pp₀ : Γ' ◂ Θ ∶ p₀
-          pp₀ = {!!}
 -}
 
 
@@ -481,8 +514,8 @@ module simpleTT (A : Set) where
   ---------------------------
   
   wkn-π : ∀ {Γ Γ' p M T} → Γ' ◂ Γ ∶ p → Γ' ⊢ M ∶ T → Γ ⊢ rename M p ∶ T
-  wkn-π πp (⊢-var inc) = ⊢-var (π-∋∶ πp inc)
-  wkn-π πp (⊢-abs {T = T} der) = ⊢-abs (wkn-π (π-cnc T =rf (λ _ → =rf) πp) der)
+  wkn-π πp (⊢-var inc) = ⊢-var (◂∶cm πp inc)
+  wkn-π πp (⊢-abs {T = T} der) = ⊢-abs (wkn-π (π-cnc-rf T πp) der)
   wkn-π πp (⊢-app der₁ der₂) = ⊢-app (wkn-π πp der₁) (wkn-π πp der₂)
 
   wkn-0 : ∀ {Γ M T} R → Γ ⊢ M ∶ T → R ∣ Γ ⊢ (ext M) ∶ T
@@ -508,9 +541,9 @@ module simpleTT (A : Set) where
 
   -- if T occurs in the i-th position in Γ' and Γ' ← Γ ∶ s,
   -- then the term s i has type T
-  σ-∋∶ : ∀ {Γ Γ' s T} → Γ ← Γ' ∶ s → ∀ {i} → Γ ∋ i ∶ T → Γ' ⊢ s i ∶ T
+  σ-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {T i} → Γ ∋ i ∶ T → Γ' ⊢ s i ∶ T
   σ-∋∶ (σ-trm eqz eqs σs der) here = ⊢∶-= eqz  der
-  σ-∋∶ (σ-trm eqz eqs σs der) {fs i} (there inc) = ⊢∶-= (eqs i) (σ-∋∶ σs inc)
+  σ-∋∶ (σ-trm eqz eqs σs der) {_} {fs i} (there inc) = ⊢∶-= (eqs i) (σ-∋∶ σs inc)
 
   σ-∋∶' : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ i → Γ' ⊢ s i ∶ pr Γ i
   σ-∋∶' σs i = σ-∋∶ σs (varty _ i)
@@ -535,44 +568,36 @@ module simpleTT (A : Set) where
           (σ-frg T (λ _ → =rf) σs) (wkn-0 T der))
           (⊢-var here)
 
-  -- projections are substitutions
-  ◂to← : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i) → Γ ◂ Γ' ∶ p → Γ ← Γ' ∶ s
-  ◂to← = {!!}
+  -- projections, and bijections, are substitutions
+  ◂∶to← : ∀ {Γ Γ' p s} → (∀ i → var (p i) == s i) → Γ ◂ Γ' ∶ p → Γ ← Γ' ∶ s
+  ◂∶to← {[]} {Γ'} {p} {s} eq πp = σ-!
+  ◂∶to← {R ∣ Γ} {Γ'} {p} {s} eq πp = σ-trm {s = var ∘ p ∘ fs} (eq fz) (λ x → eq (fs x))
+                                           (◂∶to← (λ _ → =rf) (fs-inj ∘ ◂∶ij πp , CtxMor-cmp-rf there (◂∶cm πp)))
+                                           (⊢-var (◂∶cm πp here))
+  ≡∶to← : ∀ {Γ Γ' f s} → (∀ i → var (f i) == s i) → Γ ≡ Γ' ∶ f → Γ ← Γ' ∶ s
+  ≡∶to← eq = ◂∶to← eq ∘ ≡∶to◂∶
 
-{-
-eq π-∅ =
-    σ-!
-  ◂to← eq (π-frg R eqs πp) =
-    σ-frg R (λ i → =ap var (eqs i) • eq i) (◂to← (λ _ → =rf) πp)
-  ◂to← {s = s} eq (π-cnc {p = p} {p'} R eqz eqs πp) =
-    σ-wlift R (wlift-var-fn (=ap var eqz • eq fz) (λ i → =ap var (eqs i) • eq (fs i)))
-            (◂to← (λ _ → =rf) πp)
-  ◂to← eq (π-swp {p = p} {p'} R S eqz eqsz eqss πp) =
-    σ-trm (=ap var eqz • eq fz) (λ _ → =rf)
-          (σ-wlift R (wlift-var-fn (=ap var eqsz • eq (fs fz))
-                                   (λ i → =ap var (eqss i) • eq (fs (fs i))))
-                     (σ-frg S (λ _ → =rf)
-                     (◂to← (λ _ → =rf) πp)))
-          (⊢-var (there here))
--}
+  -- substitutions of variables are context morphisms
+  σ-isCtxMor : ∀ {Γ Γ' f s} → (∀ i → var (f i) == s i) → Γ ← Γ' ∶ s → isCtxMor Γ Γ' f
+  σ-isCtxMor {R ∣ Γ} {Γ'} {f} {s} vf=s (σ-trm eqM eqs σs' derM) {R} {fz} here =
+    ⊢∶-∋∶ derM (eqM • vf=s fz ⁻¹)
+  σ-isCtxMor {R ∣ Γ} {Γ'} {f} {s} vf=s (σ-trm eqM eqs σs' derM) {T} {fs i} (there inc) =
+    ih inc
+    where ih : isCtxMor Γ Γ' (f ∘ fs)
+          ih = σ-isCtxMor (λ x → vf=s (fs x) • eqs x ⁻¹) σs'
+
+  σtoπ : ∀ {Γ Γ' p s} → (∀ {i j} → p i == p j → i == j)
+           → (∀ i → var (p i) == s i) → Γ ← Γ' ∶ s → Γ ◂ Γ' ∶ p
+  σtoπ inj eq σs = inj , σ-isCtxMor eq σs
 
   σ-id : ∀ {Γ} → Γ ← Γ ∶ var
-  σ-id {Γ} = ◂to← (λ i → =rf) (π-id (λ _ → =rf))
+  σ-id {Γ} = ◂∶to← (λ i → =rf) (π-id (λ _ → =rf))
 
   σ-rfl : ∀ {Γ s} → (∀ i → var i == s i) → Γ ← Γ ∶ s
-  σ-rfl {Γ} eq = ◂to← eq (π-id (λ _ → =rf))
+  σ-rfl {Γ} eq = ◂∶to← eq (π-id (λ _ → =rf))
 
   ←∶v-∋∶ : ∀ {Γ Γ' s} → Γ ← Γ' ∶ s → ∀ {i j} → s i == var j → Γ' ∋ j ∶ pr Γ i
   ←∶v-∋∶ σs {i} eq = ⊢∶-∋∶ (σ-∋∶' σs i) eq
-
-
-  ←to◂ : ∀ {Γ Γ' p s} → (∀ {i j} → p i == p j → i == j)
-           → (∀ i → var (p i) == s i) → Γ ← Γ' ∶ s → Γ ◂ Γ' ∶ p
-  ←to◂ inj eq σ-! = π-! _
-  ←to◂ {R ∣ Γ} {Γ'} {p} inj eq (σ-trm {s = s} {s'} eqz eqs σs der) = π-∋∶-inv inj aux
-    where aux : {i : Fin (suc (len Γ))} {T : Ty} → R ∣ Γ ∋ i ∶ T → Γ' ∋ p i ∶ T
-          aux {fz} {T} here = ⊢∶-∋∶ der (eqz • eq fz ⁻¹)
-          aux {fs i} {T} (there inc) = ⊢∶-∋∶ (σ-∋∶ σs inc) (eqs i • eq (fs i) ⁻¹)
 
   -- the substitution var ∘ pr₁₁ where (pr₁₁ : 0₂, 1₂ ⊢> 0₁)
   pr₁₁ : Fin two → Fin one
@@ -603,23 +628,16 @@ eq π-∅ =
   -- subject reduction
   ---------------------
   subj-red : ∀ {Γ T M N} → M ⟶ N → Γ ⊢ M ∶ T → Γ ⊢ N ∶ T
-  subj-red {M = app (lam M) N} {.(subst-all M (trmsect N))} (β M N) der =
+  subj-red (β M N) der =
     σ-subst-0 (⊢-app-premᵣ der) (⊢-abs-prem (⊢-app-premₗ der))
-  subj-red {M = lam M} {lam N} (βlam stp) (⊢-abs der) =
-    ⊢-abs (subj-red stp der)
-  subj-red {M = app M L} {app N L} (βappₗ stp) (⊢-app der₁ der₂) =
-    ⊢-app (subj-red stp der₁) der₂
-  subj-red {M = app L M} {app L N} (βappᵣ stp) (⊢-app der₁ der₂) =
-    ⊢-app der₁ (subj-red stp der₂)
-  -- light grey indicates that the clauses do NOT hold definitionally
+  subj-red (βlam stp) (⊢-abs der) =          ⊢-abs (subj-red stp der)
+  subj-red (βappₗ stp) (⊢-app der₁ der₂) =    ⊢-app (subj-red stp der₁) der₂
+  subj-red (βappᵣ stp) (⊢-app der₁ der₂) =    ⊢-app der₁ (subj-red stp der₂)
+  -- it is possible to make the term `M` explicit everywhere,
+  -- BUT in the third clause:
+  -- doing so makes the last two clause light grey
+  -- meaning that they do NOT hold definitionally
 
-  -----------------------------
-  -- lam M is a canonical form
-  -----------------------------
-  
-  lam-is-canf : ∀ {Γ T S M} → Γ ⊢ M ∶ T ⇒ S → is-value M
-                  → Σ[ Trm (suc (len Γ)) ] (λ x → lam x == M)
-  lam-is-canf der (val-lam {M'} nrm') = M' ,, =rf
 
   ------------
   -- progress
@@ -631,9 +649,9 @@ eq π-∅ =
     where nrmM : is-normal M
           nrmM = nrm-appₗ nrm
           M' : Trm one
-          M' = pj1 (lam-is-canf der₁ (progr der₁ nrmM))
+          M' = pj1 (⊢-val-is-lam der₁ (progr der₁ nrmM))
           λ=M : lam M' == M
-          λ=M = pj2 (lam-is-canf der₁ (progr der₁ nrmM))
+          λ=M = pj2 (⊢-val-is-lam der₁ (progr der₁ nrmM))
           stp' : app M N ⟶ subst-0 M' N
           stp' = =transp (λ x → app x N ⟶ subst-0 M' N) λ=M (β M' N)
 
@@ -648,10 +666,10 @@ eq π-∅ =
 
   var-is-neutral : ∀ {n M} → Trm-is-var {n} M → is-neutral M
   var-is-neutral {n} {M} Mvar = (is-neutral ● (pj2 Mvar)) (ntr-var {i = pj1 Mvar})
-  neutral-is-app+var : ∀ {n M} → is-neutral {n} M → Trm-is-var M + Trm-is-app M
-  neutral-is-app+var (ntr-var {i = i}) = inl (i ,, =rf) 
-  neutral-is-app+var (ntr-app {M₁} {M₂} _) = inr ((M₁ , M₂) ,, =rf)
-  -- and M and N are app+var as well, and so on
+  neutral-is-var+app : ∀ {n M} → is-neutral {n} M → Trm-is-var M + Trm-is-app M
+  neutral-is-var+app (ntr-var {i = i}) = inl (i ,, =rf) 
+  neutral-is-var+app (ntr-app {M₁} {M₂} _) = inr ((M₁ , M₂) ,, =rf)
+  -- and `M₁` is app+var as well, and so on
   neutral≠lam : ∀ {n M} → is-neutral M → ¬ (Σ[ Trm (suc n) ] (λ x → lam x == M))
   neutral≠lam ntr-var islam = lam≠var _ (pj1 islam) (pj2 islam)
   neutral≠lam (ntr-app ntr) islam = lam≠app (pj1 islam) _ _ (pj2 islam)
@@ -682,7 +700,7 @@ eq π-∅ =
   red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
   red-cand {n} M (atm a) = isStrNrm M
   red-cand {n} M (T ⇒ S) = ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
-  -- the second clause quantifies over all `k` and `N : Trm (k +N n)`
+  -- the second clause quantifies over all `k : Nat` and `N : Trm (k +N n)`
   -- as I am not able to prove that red-cand is invariant under weakening otherwise
 
   -- quite useless functions

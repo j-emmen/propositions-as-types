@@ -1088,9 +1088,9 @@ module Identity where
               pj2 z' ∎
   
 
-  ∘is-invrt : ∀ {A B C} {f : A → B}{g : B → C}
+  invrt-cmp-rf : ∀ {A B C} {f : A → B}{g : B → C}
                  → is-invrt f → is-invrt g → is-invrt (g ∘ f)
-  ∘is-invrt {A} {B} {C} {f} {g} invf invg =
+  invrt-cmp-rf {A} {B} {C} {f} {g} invf invg =
     (finv ∘ ginv)
     ,, ((λ a → =proof
        finv (ginv (g (f a)))    ==[ =ap finv (prj1 (pj2 invg) (f a)) ] /
@@ -1104,6 +1104,11 @@ module Identity where
           finv = pj1 invf
           ginv : C → B
           ginv = pj1 invg
+
+  invrt-cmp : ∀ {A B C} {f : A → B} {g : B → C} {h : A → C}
+                 → (∀ x → h x == g (f x)) → is-invrt f → is-invrt g → is-invrt h
+  invrt-cmp {A} {B} {C} {f} {g} {h} h=gf invf invg = =invrt-is-invrt h=gf (invrt-cmp-rf invf invg)
+
 
   inv-trn-pre : ∀ {A B C} {f : A → B} {g : B → C} {h : A → C}
               → (∀ a → g (f a) == h a) → is-invrt f → is-invrt h → is-invrt g
@@ -1363,7 +1368,7 @@ module Identity where
 
   ∘eqv : {A B C : Set}{f : A → B}{g : B → C}
              → is-equiv f → is-equiv g → is-equiv (g ∘ f)
-  ∘eqv {A} {B} {C} {f} {g} eqvf eqvg = invrt-is-eqv (∘is-invrt invf invg)
+  ∘eqv {A} {B} {C} {f} {g} eqvf eqvg = invrt-is-eqv (invrt-cmp-rf invf invg)
     where invf : is-invrt f
           invf = eqv-is-invrt eqvf
           invg : is-invrt g
@@ -1712,5 +1717,9 @@ module Identity where
     where g : B → A
           g = pj1 finv
 
+  inj+surj-is-invrt : ∀ {A B} {f : A → B} → is-injective f → is-surjective f → is-invrt f
+  inj+surj-is-invrt {f = f} fij fsj =
+    (λ b → pj1 (fsj b))
+    ,, ((λ a → fij (pj2 (fsj (f a)))) , (λ b → pj2 (fsj b)))
 
 -- end of file

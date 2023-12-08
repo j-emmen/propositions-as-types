@@ -31,7 +31,7 @@ module Basic-Inductives where
   ⟨_∣_⟩ : {C A B : Set} → (C → A) → (C → B) → C → A × B
   ⟨ f ∣ g ⟩ = λ x → f x , g x
 
-  infix 4 _,,_ Σ[_]_ ⟨_∣∣_⟩
+  infixr 4 _,,_ Σ[_]_ ⟨_∣∣_⟩
   data Σ[_]_ (A : Set) (B : A → Set) : Set where
     _,,_ : (a : A) → B a → Σ[ A ] B
   pj1 : {A : Set} → {B : A → Set} → Σ[ A ] B → A

@@ -580,11 +580,11 @@ module Nat-and-Fin where
   liftFin-splt+N : ∀ {n} (i : Fin (suc n)) → FinSplit+N i → FinSplit+N (fs i)
   liftFin-splt+N {n} i fsp =
     (suc fsp.nl , fsp.nr)
-    ,, (=ap suc fsp.eq
+    ,, =ap suc fsp.eq
        ,, (=proof Fin-=to→ (=ap suc fsp.eq) (fs (Fin+N-inr fz))
                                                           ==[ Fin-=to→-fsap fsp.eq _ ⁻¹ ] /
                   fs (Fin-=to→ fsp.eq (Fin+N-inr fz))             ==[ =ap fs fsp.el ]∎
-                  fs i ∎))
+                  fs i ∎)
     where module fsp = FinSplit+N fsp
 
 
@@ -593,7 +593,7 @@ module Nat-and-Fin where
                           suc (Fin-splt+N-nl x) == Fin-splt+N-nl fsp)
   restrFin-splt+N {n} i fsp =
     ((nk , fsp.nr)
-     ,, (k+sr=sn ,, elk))
+     ,, k+sr=sn ,, elk)
     ,, pj2 sk=nl
     where module fsp = FinSplit+N fsp
           z≠nl : ¬ (zero == fsp.nl)
@@ -639,8 +639,8 @@ module Nat-and-Fin where
 
   -- the (unique) splitting, and functions above instantiated
   splt+N-Fin : ∀ {n} (i : Fin (suc n)) → FinSplit+N i
-  splt+N-Fin {zero} i =              (zero , zero) ,, (=rf ,, N₁-isProp fz i)
-  splt+N-Fin {suc n} fz =            (zero , suc n) ,, (=rf ,, =rf)
+  splt+N-Fin {zero} i =              (zero , zero) ,, =rf ,, N₁-isProp fz i
+  splt+N-Fin {suc n} fz =            (zero , suc n) ,, =rf ,, =rf
   splt+N-Fin {suc n} (fs i) =        liftFin-splt+N i (splt+N-Fin i)
   module splt+N-Fin {n} (i : Fin (suc n)) = FinSplit+N (splt+N-Fin i)
 
@@ -905,7 +905,7 @@ module Nat-and-Fin where
   faceFin-img {zero} i {j} j≠i =                N₀ind (j≠i (N₁-isProp j i))
   faceFin-img {suc n} fz {j} j≠z =              Fin-dicotfs j (λ x → j≠z (x ⁻¹))
   faceFin-img {suc n} (fs i) {fz} z≠si =        fz ,, =rf
-  faceFin-img {suc n} (fs i) {fs j} sj≠si =   fs (pj1 ih) ,, =ap fs (pj2 ih)
+  faceFin-img {suc n} (fs i) {fs j} sj≠si =     fs (pj1 ih) ,, =ap fs (pj2 ih)
     where ih : Σ[ Fin n ] (λ x → faceFin-fun i x == j)
           ih = faceFin-img i {j} (λ x → sj≠si (=ap fs x))
 
@@ -922,18 +922,43 @@ module Nat-and-Fin where
                       → Fin n → Fin m
   faceFin-restr {n} {m} f i f≠i j = pj1 (faceFin-img i (f≠i j))
 
-  faceFin-restr-tr : ∀ {n m} (f : Fin n → Fin (suc m)) (i : Fin (suc m))
+  faceFin-restr-tr : ∀ {n m} {f : Fin n → Fin (suc m)} (i : Fin (suc m))
                        → (f≠i : ∀ j → ¬ (f j == i))
                          → ∀ j → (faceFin-fun i ∘ faceFin-restr f i f≠i) j == f j
-  faceFin-restr-tr {n} {m} f i f≠i j = pj2 (faceFin-img i (f≠i j))
+  faceFin-restr-tr i f≠i j = pj2 (faceFin-img i (f≠i j))
 
   faceFin-restr-inj : ∀ {n m} {f : Fin n → Fin (suc m)} {i : Fin (suc m)}
                         → (f≠i : ∀ j → ¬ (f j == i)) → is-injective f
                           → is-injective (faceFin-restr f i f≠i)
   faceFin-restr-inj {f = f} {i} f≠i finj = 
     injective-tr {f = faceFin-restr f i f≠i} {faceFin-fun i} {f}
-                 (λ {j} → faceFin-restr-tr f i f≠i j)
+                 (λ {j} → faceFin-restr-tr i f≠i j)
                  finj
+
+  faceFin-restr-precmp : ∀ {n m k} (g : Fin k → Fin n) {f : Fin n → Fin (suc m)}
+                         (i : Fin (suc m)) (miss : ∀ j → ¬ (f j == i))
+                             →  ∀ j → faceFin-restr (f ∘ g) i (λ x → miss (g x)) j == faceFin-restr f i miss (g j)
+  faceFin-restr-precmp  g {f} i miss j = faceFin-inj i (=proof
+    faceFin-fun i (faceFin-restr (f ∘ g) i (λ x → miss (g x)) j)
+                  ==[ faceFin-restr-tr i  (λ x → miss (g x)) j ] /
+    f (g j)
+                  ==[ faceFin-restr-tr i miss (g j) ⁻¹ ]∎
+    faceFin-fun i (faceFin-restr f i miss (g j)) ∎)
+
+  faceFin-restr-ext : ∀ {n m} {f f' : Fin n → Fin (suc m)} (i : Fin (suc m))
+                      (miss : ∀ j → ¬ (f j == i)) (miss' : ∀ j → ¬ (f' j == i))
+                        → (∀ j → f j == f' j)
+                          →  ∀ j → faceFin-restr f i miss j == faceFin-restr f' i miss' j
+  faceFin-restr-ext {f = f} {f'} i miss miss' f=f' j = faceFin-inj i (=proof
+    faceFin-fun i (faceFin-restr f i miss j)
+                  ==[ faceFin-restr-tr i miss j ] /
+    f j
+                  ==[ f=f' j ] /
+    f' j
+                  ==[ faceFin-restr-tr i miss' j ⁻¹ ]∎
+    faceFin-fun i (faceFin-restr f' i miss' j) ∎)
+
+  -- removing an element from the image of an injective function
 
   faceFin-restrinj : ∀ {n m} (f : Fin (suc n) → Fin (suc m))
                       → is-injective f → (i : Fin (suc n)) → Fin n → Fin m
@@ -944,7 +969,7 @@ module Nat-and-Fin where
   faceFin-restrinj-tr : ∀ {n m} {f : Fin (suc n) → Fin (suc m)}
                        → (finj : is-injective f) → (i : Fin (suc n))
                          → ∀ j → (faceFin-fun (f i) ∘ faceFin-restrinj f finj i) j == (f ∘ faceFin-fun i) j
-  faceFin-restrinj-tr {f = f} finj i = faceFin-restr-tr (f ∘ faceFin-fun i) (f i) fj≠fi
+  faceFin-restrinj-tr {f = f} finj i = faceFin-restr-tr (f i) fj≠fi
     where fj≠fi : ∀ j → ¬ (f (faceFin-fun i j) == f i)
           fj≠fi j ff=fi = faceFin.miss i j (finj ff=fi)
 
@@ -956,8 +981,90 @@ module Nat-and-Fin where
     where fj≠fi : ∀ j → ¬ (f (faceFin-fun i j) == f i)
           fj≠fi j ff=fi = faceFin.miss i j (finj ff=fi)
 
-  --faceFin+N-l : ∀ j → (faceFin-fun i ∘ Fin-=to→ li+ri=n ∘ Fin+N-inl {li} {ri}) j == (Fin-=to→ li+sri=sn ∘ Fin+N-inl) j
+{-
+  faceFin-restrinj-tact :  ∀ {n m} (g : Fin n → Fin m) {f : Fin (suc n) → Fin (suc m)}
+                             (finj : is-injective f) (i : Fin (suc n))
+                               → ∀ j → faceFin-fun (f i) (faceFin-restrinj f finj i j) == faceFin-fun (f i) (g j)
+                                       → faceFin-restrinj f finj i j == g j
+  faceFin-restrinj-tact g {f} finj i j = faceFin-inj (f i)
+-}
+
+  faceFin-restrinj-=pt :  ∀ {n m} {f : Fin (suc n) → Fin (suc m)}
+                            (finj : is-injective f) {i i' : Fin (suc n)}
+                              → i == i' → ∀ j → faceFin-restrinj f finj i j == faceFin-restrinj f finj i' j
+  faceFin-restrinj-=pt {f = f} finj i=i' j = =ap (λ x → faceFin-restrinj f finj x j) i=i' 
+
+  faceFin-restrinj-id :  ∀ {n} (i : Fin (suc n))
+                           → ∀ j → faceFin-restrinj id id i j == j
+  faceFin-restrinj-id i j = faceFin-inj i (faceFin-restrinj-tr id i j)
+
+  faceFin-restrinj-cmp-rf :  ∀ {n m k} {f : Fin (suc n) → Fin (suc m)} {g : Fin (suc m) → Fin (suc k)}
+                             (finj : is-injective f) (ginj : is-injective g) (i : Fin (suc n))
+                               → ∀ j → faceFin-restrinj g ginj (f i) (faceFin-restrinj f finj i j)
+                                                  == faceFin-restrinj (g ∘ f) (finj ∘ ginj) i j
+  faceFin-restrinj-cmp-rf {f = f} {g} finj ginj i j = faceFin-inj (g (f i)) (=proof
+    faceFin-fun (g (f i)) (faceFin-restrinj g ginj (f i) (faceFin-restrinj f finj i j))
+                                                           ==[ faceFin-restrinj-tr ginj (f i) _ ] /
+    (g ∘ faceFin-fun (f i) ∘ faceFin-restrinj f finj i) j
+                                                           ==[ =ap g (faceFin-restrinj-tr finj i j) ] /
+    (g ∘ f ∘ faceFin-fun i) j
+                                                           ==[ faceFin-restrinj-tr (finj ∘ ginj) i j ⁻¹ ]∎
+    faceFin-fun (g (f i)) (faceFin-restrinj (g ∘ f) (finj ∘ ginj) i j) ∎)
+
+  faceFin-restrinj-ext :  ∀ {n m} {f f' : Fin (suc n) → Fin (suc m)}
+                            (finj : is-injective f) (finj' : is-injective f') (i : Fin (suc n))
+                              → (∀ j → f j == f' j)
+                                → ∀ j → faceFin-restrinj f finj i j == faceFin-restrinj f' finj' i j
+  faceFin-restrinj-ext {f = f} {f'} finj finj' i f=f' j = faceFin-inj (f i) (=proof
+    faceFin-fun (f i) (faceFin-restrinj f finj i j)
+                                                      ==[ faceFin-restrinj-tr finj i j ] /
+    f (faceFin-fun i j)
+                                                      ==[ f=f' _ ] /
+    f' (faceFin-fun i j)
+                                                      ==[ faceFin-restrinj-tr finj' i j ⁻¹ ] /
+    faceFin-fun (f' i) (faceFin-restrinj f' finj' i j)
+                                                      ==[ =ap (λ x → faceFin-fun x _) (f=f' i ⁻¹) ]∎
+    faceFin-fun (f i) (faceFin-restrinj f' finj' i j) ∎)
+  
+  faceFin-restrinj-invrt : ∀ {n m} {f : Fin (suc n) → Fin (suc m)}
+                             (finj : is-injective f) (i : Fin (suc n))
+                               → is-invrt f → is-invrt (faceFin-restrinj f finj i)
+  faceFin-restrinj-invrt {n} {m} {f} finj i finv =
+    faceFin-restrinj g ginj (f i)
+    ,, (lft , rgt)
+    where g : Fin (suc m) → Fin (suc n)
+          g = pj1 finv
+          ginv : is-invrt g
+          ginv = f ,, (prj2 (pj2 finv) , prj1 (pj2 finv))
+          ginj : is-injective g
+          ginj = invrt-is-injective ginv
+          rstf : Fin n → Fin m
+          rstf = faceFin-restrinj f finj fz
+          rstg : Fin m → Fin n
+          rstg = faceFin-restrinj g ginj (f fz)
+          lft : (j : Fin n) → faceFin-restrinj g ginj (f i) (faceFin-restrinj f finj i j) == j
+          lft j = =proof
+            faceFin-restrinj g ginj (f i) (faceFin-restrinj f finj i j)
+                                          ==[ faceFin-restrinj-cmp-rf finj ginj i j ] /
+            faceFin-restrinj (g ∘ f) (finj ∘ ginj) i j
+                                          ==[ faceFin-restrinj-ext (finj ∘ ginj) id i (prj1 (pj2 finv)) j ] /
+            faceFin-restrinj id id i j
+                                          ==[ faceFin-restrinj-id i j ]∎
+            j ∎
+          rgt : (j : Fin m) → faceFin-restrinj f finj i (faceFin-restrinj g ginj (f i) j) == j
+          rgt j = =proof
+            faceFin-restrinj f finj i (faceFin-restrinj g ginj (f i) j)
+                                          ==[ faceFin-restrinj-=pt finj (prj1 (pj2 finv) i ⁻¹) _ ] /
+            faceFin-restrinj f finj (g (f i)) (faceFin-restrinj g ginj (f i) j)
+                                          ==[ faceFin-restrinj-cmp-rf ginj finj (f i) j ] /
+            faceFin-restrinj (f ∘ g) (ginj ∘ finj) (f i) j
+                                          ==[ faceFin-restrinj-ext (ginj ∘ finj) id (f i) (prj2 (pj2 finv)) j ] /
+            faceFin-restrinj id id (f i) j
+                                          ==[ faceFin-restrinj-id (f i) j ]∎
+            j ∎
+
           
+
 
   -- function that repeats an element (degeneracy map)
   -- it maps i,i+1 to i.
@@ -1096,6 +1203,19 @@ module Nat-and-Fin where
   liftFin-inj finj {fs x} {fs x'} eq = =ap fs (finj (fs-inj eq))
 
 
+  liftFin-invrt : ∀ {n m} {f : Fin n → Fin m}
+                  → is-invrt f → is-invrt (liftFin f)
+  liftFin-invrt {n} {m} {f} finv = liftFin g ,, (lglf=id , lflg=id)
+    where g : Fin m → Fin n
+          g = pj1 finv
+          lglf=id : ∀ x → liftFin g (liftFin f x) == x
+          lglf=id fz = =rf
+          lglf=id (fs x) = =ap fs (prj1 (pj2 finv) x)
+          lflg=id : ∀ x → liftFin f (liftFin g x) == x
+          lflg=id fz = =rf
+          lflg=id (fs x) = =ap fs (prj2 (pj2 finv) x)
+
+
   swapFin-ptw : ∀ {n m}{f : Fin n → Fin m}{g : Fin (suc (suc n)) → Fin (suc (suc m))}
                    → fs fz == g fz → fz == g (fs fz)
                      → (∀ i → fs (fs (f i)) == g (fs (fs i)))
@@ -1130,45 +1250,30 @@ module Nat-and-Fin where
   swapFin-inj finj {fs i} {fs j} eq =
     =ap fs (liftFin-inj (finj ∘ fs-inj) eq)
 
-
-  Fin+one-ind :  ∀ {n} {C : Fin (suc n) → Set} (i : Fin (suc n))
-                   → (cel : C i) → (cfun : ∀ x → C (faceFin-fun i x))
-                     → ∀ j → Σ[ C j ] ( λ x →
-                                ((e : i == j) →  x == (C ● e) cel)
-                                × ((z : Σ[ Fin n ] (λ y → faceFin-fun i y == j)) → x == (C ● pj2 z) (cfun (pj1 z))) )
-  Fin+one-ind {n} {C} i cel cfun j =
-    [ ( λ e → (C ● e) cel
-             ,, ( (λ e' → ●irrelₚₜ (Fin-isSet (suc n)) e e' cel)
-                , λ z → N₀rec (faceFin.miss i (pj1 z) (pj2 z • e ⁻¹)) ))
-    ∣ ( λ z → (C ● pj2 z) (cfun (pj1 z))
-             ,, ( (λ e → N₀rec (faceFin.miss i (pj1 z) (pj2 z • e ⁻¹)))
-                , λ z' → =proof
-      (C ● pj2 z) (cfun (pj1 z))
-                             ==[ =transp-back-forth-ptw⁻¹ C (pj2 z') _ ] /
-      (C ● pj2 z') ((C ● pj2 z' ⁻¹) ((C ● pj2 z) (cfun (pj1 z))))
-                             ==[ =ap (C ● pj2 z') (=proof
-                   (C ● pj2 z' ⁻¹) ((C ● pj2 z) (cfun (pj1 z)))
-                                        ==[ =transp-•-ptw C (pj2 z) (pj2 z' ⁻¹) _ ] /
-                   (C ● (pj2 z • pj2 z' ⁻¹)) (cfun (pj1 z))
-                                        ==[ =ap (λ x → (C ● x) (cfun (pj1 z))) (pj2 (faceFin-idfull i (pj2 z • pj2 z' ⁻¹)) ⁻¹ ) ] /
-                   (C ● =ap (faceFin-fun i) (faceFin-inj i (pj2 z • pj2 z' ⁻¹))) (cfun (pj1 z))
-                                        ==[ ●=ap-is-● C (faceFin-fun i) (faceFin-inj i (pj2 z • pj2 z' ⁻¹)) _ ] /
-                   ((C ∘' (faceFin-fun i)) ● faceFin-inj i (pj2 z • pj2 z' ⁻¹)) (cfun (pj1 z))
-                                        ==[ =apd cfun (faceFin-inj i (pj2 z • pj2 z' ⁻¹)) ]∎
-                   cfun (pj1 z') ∎) ]∎
-      (C ● pj2 z') (cfun (pj1 z')) ∎ ))
-    ] (faceFin-dicot i j)
+  swapFin-invrt : ∀ {n m} {f : Fin n → Fin m}
+                  → is-invrt f → is-invrt (swapFin f)
+  swapFin-invrt {n} {m} {f} finv = swapFin g ,, (lglf=id , lflg=id)
+    where g : Fin m → Fin n
+          g = pj1 finv
+          lglf=id : ∀ x → swapFin g (swapFin f x) == x
+          lglf=id fz = =rf
+          lglf=id (fs fz) = =rf
+          lglf=id (fs (fs x)) = =ap (fs ∘ fs) (prj1 (pj2 finv) x)
+          lflg=id : ∀ x → swapFin f (swapFin g x) == x
+          lflg=id fz = =rf
+          lflg=id (fs fz) = =rf
+          lflg=id (fs (fs x)) = =ap (fs ∘ fs) (prj2 (pj2 finv) x)
 
 
-  -- an injective function between finite sets of the same length is also surjective
+  -- the pigeonhole principle, and related stuff
 
-  Fin-pdghl : ∀ {n m} {f : Fin n → Fin m} → n == m → is-injective f → is-surjective f
-  Fin-pdghl {n} {zero} {f} z=m finj j =
+  Fin-pgnhl : ∀ {n m} {f : Fin n → Fin m} → n == m → is-injective f → is-surjective f
+  Fin-pgnhl {n} {zero} {f} z=m finj j =
     N₀rec j
-  Fin-pdghl {suc n} {suc m} {f} sn=sm finj =
+  Fin-pgnhl {suc n} {suc m} {f} sn=sm finj =
     pj1 (faceFin-ind (f fz) (fz ,, =rf) ≠ffz)
     where ih : is-surjective (faceFin-restrinj f finj fz)
-          ih = Fin-pdghl (suc-inj sn=sm) (faceFin-restrinj-inj finj fz)
+          ih = Fin-pgnhl (suc-inj sn=sm) (faceFin-restrinj-inj finj fz)
           ≠ffz : ∀ j → fib f (faceFin-fun (f fz) j)
           ≠ffz j = fs (pj1 (ih j))
                    ,, (=proof
@@ -1177,16 +1282,18 @@ module Nat-and-Fin where
                                             ==[ =ap (faceFin-fun (f fz)) (pj2 (ih j)) ]∎
             faceFin-fun (f fz) j ∎)
 
+  Fin-invrt-=len : ∀ {n m} {f : Fin n → Fin m} → is-invrt f → n == m
+  Fin-invrt-=len {zero} {zero} {f} finv =      =rf
+  Fin-invrt-=len {zero} {suc m} {f} finv =     N₀rec (pj1 finv fz)
+  Fin-invrt-=len {suc n} {zero} {f} _ =        N₀rec (f fz)
+  Fin-invrt-=len {suc n} {suc m} {f} finv =
+    =ap suc (Fin-invrt-=len {f = faceFin-restrinj f finj fz}
+                            (faceFin-restrinj-invrt finj fz finv))
+    where finj : is-injective f
+          finj = invrt-is-injective finv
 
 
 
-{-
-  Fin-pdghl {zero} {m} {f} z=m finj = λ b → N₀rec ((Fin ● z=m ⁻¹) b)
-  Fin-pdghl {suc n} {m} {f} sn=m finj b =
-    [ (λ eq → fz ,, eq)
-    ∣ (λ ne → {!faceFin-restr!})
-    ] (Fin-is-decid (f fz) b)
--}
 
 --   liftFin-any :  ∀ {n m} → (f : Fin n → Fin m) (i : Fin (suc n)) (j : Fin (suc m))
 --                    → Σ[ (Fin (suc n) → Fin (suc m)) ] (λ x → (x i == j) × (∀ y → (x ∘ faceFin-fun i) y == (faceFin-fun j ∘ f) y))

@@ -637,7 +637,7 @@ module Lambda-Calculus where
                → Σ[ Trm (suc n) ]
                    (λ x → Σ[ M ⟶ x × (lam x == N) ]
                             λ z → ((lam M ⟶_) ● prj2 z) (βlam (prj1 z)) == stp)
-  βlam-inv {n} {M} {lam N'} (βlam stp) = N' ,, ((stp , =rf) ,, =rf)
+  βlam-inv {n} {M} {lam N'} (βlam stp) = N' ,, (stp , =rf) ,, =rf
   βlam-inv-trm : ∀ {n} {M : Trm (suc n)} {N : Trm n}(stp : lam M ⟶ N)
                    → Trm (suc n)
   βlam-inv-trm stp = pj1 (βlam-inv stp)
@@ -719,7 +719,7 @@ module Lambda-Calculus where
                  → Σ[ Trm n ]
                      ( λ x → Σ[ M ⟶ x × (app (var i) x == N) ]
                        (λ z → ((app (var i) M ⟶_) ● prj2 z) (βappᵣ (prj1 z)) == stp))
-  βappvar-inv {n} {i} {M} {.(app (var i) _)} (βappᵣ stp) = _ ,, ((stp , =rf) ,, =rf)
+  βappvar-inv {n} {i} {M} {.(app (var i) _)} (βappᵣ stp) = _ ,, (stp , =rf) ,, =rf
   βappvar-inv-trm : ∀ {n} {i} {M N : Trm n} (stp : app (var i) M ⟶ N)
                        → Trm n
   βappvar-inv-trm stp = pj1 (βappvar-inv stp)
@@ -795,9 +795,9 @@ module Lambda-Calculus where
                   + Σ[ Trm n ] (λ x → Σ[ N ⟶ x × (app (app M₁ M₂) x == P) ]
                     (λ z → ((app (app M₁ M₂) N ⟶_) ● prj2 z) (βappᵣ (prj1 z)) == stp))
   βappapp-inv {n} {M₁} {M₂} {N} {.(app _ N)} (βappₗ stp) =
-    inl (_ ,, ((stp , =rf) ,, =rf))
+    inl (_ ,, (stp , =rf) ,, =rf)
   βappapp-inv {n} {M₁} {M₂} {N} {.(app (app M₁ M₂) _)} (βappᵣ stp) =
-    inr (_ ,, ((stp , =rf) ,, =rf))
+    inr (_ ,, (stp , =rf) ,, =rf)
 
   βappapp-stp-inv : ∀ {n} {M₁ M₂ N : Trm n}
                   → Σ[ Trm n ] (app (app M₁ M₂) N ⟶_)
@@ -870,9 +870,9 @@ module Lambda-Calculus where
                          + Σ[ Trm n ] ( λ x → Σ[ N ⟶ x × (app (lam M) x == P) ]
                            ( λ y → ((app (lam M) N ⟶_) ● (prj2 y)) (βappᵣ (prj1 y)) == stp ))
   βapplam-inv (β M N)              = inl (=rf ,, =rf)
-  βapplam-inv (βappₗ (βlam stp))    = inr (inl (_ ,, ((stp , =rf) ,, =rf)))
+  βapplam-inv (βappₗ (βlam stp))    = inr (inl (_ ,, (stp , =rf) ,, =rf))
   -- two induction steps are needed here to unify things
-  βapplam-inv (βappᵣ stp)           = inr (inr (_ ,, ((stp , =rf) ,, =rf)))
+  βapplam-inv (βappᵣ stp)           = inr (inr (_ ,, (stp , =rf) ,, =rf))
 
   βapplam-stp-inv-aux : ∀ {n} {M : Trm (suc n)} {N P : Trm n} (stp : app (lam M) N ⟶ P)
                         → Σ[ subst-0 M N == P ]
@@ -1384,7 +1384,8 @@ module Lambda-Calculus where
   strnrm-appᵣ : ∀ {n M N} → isStrNrm (app {n} M N) → isStrNrm N
   strnrm-appᵣ sn = pj1 sn ,, strnrmₗₑᵥ-appᵣ (pj2 sn)
 
--- number of one step β-reductions from a term
+
+  -- number of one step β-reductions from a term
   ⟶# : ∀ {n} → Trm n → Nat
   ⟶# (var i) = zero
   ⟶# (lam M) = ⟶# M
@@ -1525,21 +1526,21 @@ module Lambda-Calculus where
           aux-inv : is-invrt (aux Mlam-or-not)
           aux-inv =
             +ind (λ v → is-invrt (aux v))
-                 (λ z → ∘is-invrt {f = Fin-=to→ (⟶#app+lam N z)}
-                                  {Fin+N-fnc (λ (_ : N₁) → inl z)
-                                             (inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf))}
-                                  (Fin-=to→-invrt (⟶#app+lam N z))
-                                  (Fin+N-fnc-invrt (eqv-is-invrt
-                                          (cntr-N₁-fnc-is-eqv (true-prop-is-contr
-                                                   (idfull-fib-is-prop lam-inj-all M) z)
-                                                              (λ _ → z)))
-                                                   (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
-                                                                    (eqv-is-invrt ihNeqv))))
-                 (λ z → ∘is-invrt {f = Fin-=to→ (⟶#app+not-lam N z ⁻¹)}
-                                   {inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf)}
-                                   (Fin-=to→-invrt (⟶#app+not-lam N z ⁻¹))
-                                   (+N₀invrtr z (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
-                                                                 (eqv-is-invrt ihNeqv)) ))
+                 (λ z → invrt-cmp-rf {f = Fin-=to→ (⟶#app+lam N z)}
+                                        {Fin+N-fnc (λ (_ : N₁) → inl z)
+                                                   (inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf))}
+                                        (Fin-=to→-invrt (⟶#app+lam N z))
+                                        (Fin+N-fnc-invrt (eqv-is-invrt
+                                                           (cntr-N₁-fnc-is-eqv (true-prop-is-contr
+                                                              (idfull-fib-is-prop lam-inj-all M) z)
+                                                                (λ _ → z)))
+                                                         (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
+                                                                          (eqv-is-invrt ihNeqv))))
+                 (λ z → invrt-cmp-rf {f = Fin-=to→ (⟶#app+not-lam N z ⁻¹)}
+                                      {inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf)}
+                                      (Fin-=to→-invrt (⟶#app+not-lam N z ⁻¹))
+                                      (+N₀invrtr z (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
+                                                                    (eqv-is-invrt ihNeqv)) ))
                  Mlam-or-not
           aenm : Fin (⟶# (app M N)) → Σ[ Trm n ] (app M N ⟶_)
           aenm = βapp-stp {n} {M} {N} ∘ aux Mlam-or-not
