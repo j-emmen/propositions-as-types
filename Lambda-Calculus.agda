@@ -235,19 +235,6 @@ module Lambda-Calculus where
   ext-lam-is-lam : ∀ {n M} → Trm-is-lam M → Trm-is-lam (ext {n} M)
   ext-lam-is-lam = rename-lam-is-lam fs
 
-{-
-  rename-lam-is-lam⁻¹ : ∀ {n m M} (f : Fin n → Fin m) → Trm-is-lam (rename M f) → Trm-is-lam M
-  rename-lam-is-lam⁻¹ f islam = {!pj2 islam!}
-  ext-lam-is-lam⁻¹ : ∀ {n M} → Trm-is-lam (ext {n} M) → Trm-is-lam M
-  ext-lam-is-lam⁻¹ {n} {M} (P ,, eq) = {!(Trm-is-lam ● eq)!}
-
-    rename (pj1 islam) (Fin-diag {n})
-    ,, {!=proof lam (rename (pj1 islam) (Fin-diag {n})) ==[ ? ] /
-               --rename (lam (pj1 islam)) (Fin-diag {n}) ==[ ? ] /
-               rename (ext M) (Fin-diag {n}) ==[ ? ]∎
-               M ∎!}
--}
-
   rename-sq : {n m : Nat}(M : Trm n){f : Fin n → Fin m}{f' : Fin (suc n) → Fin (suc m)}
               {g : Fin n → Fin (suc n)}{g' : Fin m → Fin (suc m)}
                  → (∀ i → g' (f i) == f' (g i))
@@ -845,7 +832,7 @@ module Lambda-Calculus where
   βapplam-stp-med-invrt : ∀ {n} {M : Trm (suc n)} {N : Trm n}
                             → is-invrt (βapplam-stp-med {n} {M} {N})
   βapplam-stp-med-invrt {n} {M} {N} =
-    eqv-is-invrt (+eqv3 eqv₁ (βlam-eqv {n} {M}) id-is-eqv)
+    equiv-is-invrt (+eqv3 eqv₁ (βlam-eqv {n} {M}) id-is-eqv)
     where f₁ : N₁ → Σ[ Trm (suc n) ] (λ x → lam x == lam M)
           f₁ = λ _ → M ,, =rf
           lamaux : Σ[ Trm (suc n) ] (_== M) → Σ[ Trm (suc n) ] (λ x → lam x == lam M)
@@ -1007,10 +994,14 @@ module Lambda-Calculus where
             (β (subst-all M (wlift f)) (subst-all N f))
   ⟶-subst-all f {lam M} (βlam redM) =
     βlam (⟶-subst-all (wlift f) redM)
-  ⟶-subst-all f {app M N} (βappₗ redM) =
+  ⟶-subst-all f (βappₗ redM) =
     βappₗ (⟶-subst-all f redM)
   ⟶-subst-all f {app M N} (βappᵣ redM) =
     βappᵣ (⟶-subst-all f redM)
+  -- making the term explicit in the third clause would make
+  -- the last two clauses light grey,
+  -- meaning that they do NOT hold definitionally
+  -- this also happens in subject reduction (simpleTT.agda)
 
   ⟶-trmsect : {n : Nat}{N N' : Trm n} → N ⟶ N'
                 → ∀ i → trmsect N i ⟶⋆ trmsect N' i
@@ -1037,21 +1028,6 @@ module Lambda-Calculus where
   ⟶⋆-rename {M = M} {M} f (tcrfl M) =
     ⟶⋆rfl (rename M f)
   ⟶⋆-rename {M = M} {N} f (tccnc red stp) = tccnc (⟶⋆-rename f red) (⟶-rename f stp)
-{-
-  ⟶⋆-rename {M = M} {.(subst-all M₁ (trmsect N))} f (tccnc redM (β M₁ N)) =
-    ⟶⋆cnc (⟶⋆-rename f redM)
-           (=transp (λ x → app (lam (rename M₁ (liftFin f))) (rename N f) ⟶ x)
-                    (subst-0-rename M₁ N f) (β _ _))
-  ⟶⋆-rename {M = M} {lam M'} f (tccnc redM (βlam stpM)) =
-    ⟶⋆cnc (⟶⋆-rename f redM)
-           (βlam (⟶-rename (liftFin f) stpM))
-  ⟶⋆-rename {M = M} {app M' N'} f (tccnc redM (βappₗ stpM)) =
-    ⟶⋆cnc (⟶⋆-rename f redM)
-           (βappₗ (⟶-rename f stpM))
-  ⟶⋆-rename {M = M} {app M' N'} f (tccnc redM (βappᵣ stpM)) =
-    ⟶⋆cnc (⟶⋆-rename f redM)
-           (βappᵣ (⟶-rename f stpM))
--}
 
   ⟶⋆-ext : {n : Nat}{M M' : Trm n}
               → M ⟶⋆ M' → ext M ⟶⋆ ext M'
@@ -1106,9 +1082,10 @@ module Lambda-Calculus where
 
   -- It seems that Agda does not accet non-canonical terms as explicit arguments
   -- in inductive definitions (which makes sense),
-  -- but this means that M' and N' cannot be named in the inductive definition of ≡>-rename
-  -- as they appear in subst-0 M' N'.
-  -- Therefore this term is needed to make M' and N' explicit and avoid yellow in ≡>-rename.
+  -- but this means that M' and N' cannot be named in the inductive definition
+  -- of ≡>-rename as they appear in subst-0 M' N'.
+  -- Therefore the followingterm is needed to make M' and N' explicit
+  -- and avoid yellow in ≡>-rename.
   ≡>-rename-aux : {n m : Nat}{M M' : Trm (suc n)}{N N' : Trm n}(f f' : Fin n → Fin m)
                         → M ≡> M' → N ≡> N' → rename M (liftFin f) ≡> rename M' (liftFin f')
                           → rename N f ≡> rename N' f'
@@ -1181,14 +1158,19 @@ module Lambda-Calculus where
 
   -- order between reduction relations
   ⟶<≡> : {n : Nat}{M N : Trm n} → M ⟶ N → M ≡> N
-  ⟶<≡> {_} {app (lam M) N} (β M N) =
+  ⟶<≡> {M = app (lam M) N} (β M N) =
     ≡>red (≡>rfl {M = M}) (≡>rfl {M = N})
-  ⟶<≡> {_} {lam M} {lam M'} (βlam stp) =
+  ⟶<≡> {M = lam M} {lam M'} (βlam stp) =
     ≡>lam (⟶<≡> stp)
-  ⟶<≡> {_} {app M N} (βappₗ stp) =
+  ⟶<≡> {M = _} {app _ N} (βappₗ stp) =
     ≡>app (⟶<≡> stp) (≡>rfl {M = N})
-  ⟶<≡> {_} {app M N} (βappᵣ stp) =
+  ⟶<≡> {M = app M N} (βappᵣ stp) =
     ≡>app (≡>rfl {M = M}) (⟶<≡> stp)
+  -- making the term `M` explicit in the third clause
+  -- would make the last two light grey,
+  -- meaning that they do NOT hold definitionally
+  -- this also happens in `⟶-subst-all` (LambdaCalculus.agda)
+
 
   ≡><⟶⋆ : {n : Nat}{M N : Trm n} → M ≡> N → M ⟶⋆ N
   ≡><⟶⋆ {_} {M} ≡>rfl =
@@ -1410,67 +1392,6 @@ module Lambda-Calculus where
   ⟶#app+not-lam {n} {app M₁ M₂} N nlam =       =rf
 
 
-{- one-to-one enumeration below
-  -- enumeration of one-step reductions of a term
-  ⟶enm : ∀ {n} M → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
-  ⟶enm {n} (lam M) i =
-    lam (pj1 (ih i)) ,, βlam (pj2 (ih i))
-    where ih : Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
-          ih = ⟶enm M
-  ⟶enm {n} (app M₁ M₂) = +rec3 (λ z → fv (pj2 z))
-                                 (λ z → fl (pj2 z))
-                                 (λ z → fa (pj2 z))
-                                 M₁EM
-    -- Agda complains if we try induction on M₁, so try propositionally instead.
-    where M₁EM : Trm-Cases M₁
-          M₁EM = Trm-cases M₁
-          enmM₁ : Fin (⟶# M₁) → Σ[ Trm n ] (M₁ ⟶_)
-          enmM₁ = ⟶enm M₁
-          enmM₂ : Fin (⟶# M₂) → Σ[ Trm n ] (M₂ ⟶_)
-          enmM₂ = ⟶enm M₂
-          -- if var i == M₁, only the reductions of M₂ matter
-          enmM₂v : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (M₂ ⟶_)
-          enmM₂v eq j = enmM₂ (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
-          fv : ∀ {i} → var i == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fv eq j = app M₁ (pj1 (enmM₂v eq j)) ,, βappᵣ (pj2 (enmM₂v eq j))
-          -- if lam M == M₁, we have to count β in addition to the reductions of M and M₂
-          -- reductions M ⟶_ are in bijections with reductions M₁ ⟶
-          bjlF : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Fin (⟶# M₁)
-          bjlF = =transp (λ x → Fin (⟶# x))
-          bjlT : ∀ {M} → lam M == M₁ → Σ[ Trm n ] (M₁ ⟶_) → Σ[ Trm (suc n) ] (M ⟶_)
-          bjlT {M} eq (N ,, stp) = βlam-inv-trm (((_⟶ N) ● eq ⁻¹) stp)
-                                   ,, βlam-inv-stp (((_⟶ N) ● eq ⁻¹) stp)
-          -- so we can enumerate the reductions of M without using ⟶enm
-          enmM₁l : ∀ {M} → lam M == M₁ → Fin (⟶# M) → Σ[ Trm (suc n) ] (M ⟶_)
-          enmM₁l eq = bjlT eq ∘ enmM₁ ∘ bjlF eq
-          -- the reductions are β, those of M and those of M₂
-          enm-al : ∀ {M} → lam M == M₁ → Fin (suc (⟶# M +N ⟶# M₂)) → Σ[ Trm n ] ((app M₁ M₂ ⟶_))
-          enm-al {M} eq fz =
-            subst-0 M M₂ ,, =transp (λ x → app x M₂ ⟶ subst-0 M M₂) eq (β M M₂)
-          enm-al {M} eq (fs j) =
-            Fin+N-fnc (λ x → app (lam (pj1 (enmM₁l eq x))) M₂
-                             ,, βappₗ (((_⟶ lam (pj1 (enmM₁l eq x)))● eq)
-                                                           (βlam (pj2 (enmM₁l eq x)))))
-                      (λ x → app M₁ (pj1 (enmM₂ x))
-                             ,, βappᵣ (pj2 (enmM₂ x)))
-                      j
-          fl : ∀ {M} → lam M == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fl eq j = enm-al eq (=transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹) j)
-          -- if app M N == M₁, only the reductions of M₁ and M₂ matter
-          bjaF : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M N)) → Fin (⟶# M₁)
-          bjaF = =transp (λ x → Fin (⟶# x))
-          bjaFa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app (app M N) M₂)) → Fin (⟶# (app M₁ M₂))
-          bjaFa = =transp (λ x → Fin (⟶# (app x M₂)))
-          bjaFa⁻¹ : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Fin (⟶# (app (app M N) M₂))
-          bjaFa⁻¹ eq = =transp (λ x → Fin (⟶# (app x M₂))) (eq ⁻¹)
-          fa : ∀ {M N} → app M N == M₁ → Fin (⟶# (app M₁ M₂)) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-          fa {M} {N} eq = Fin+N-fnc (f₁ ∘ bjaF eq) f₂ ∘ bjaFa⁻¹ eq
-            where f₁ : Fin (⟶# M₁) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-                  f₁ j = app (pj1 (enmM₁ j)) M₂ ,, βappₗ (pj2 (enmM₁ j))
-                  f₂ : Fin (⟶# M₂) → Σ[ Trm n ] (app M₁ M₂ ⟶_)
-                  f₂ j = app M₁ (pj1 (enmM₂ j)) ,, βappᵣ (pj2 (enmM₂ j))
--}
-
   -- exact enumeration of one-step reductions of a term
   ⟶enmex : ∀ {n} M → Σ[ (Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)) ] is-equiv
 
@@ -1530,17 +1451,17 @@ module Lambda-Calculus where
                                         {Fin+N-fnc (λ (_ : N₁) → inl z)
                                                    (inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf))}
                                         (Fin-=to→-invrt (⟶#app+lam N z))
-                                        (Fin+N-fnc-invrt (eqv-is-invrt
+                                        (Fin+N-fnc-invrt (equiv-is-invrt
                                                            (cntr-N₁-fnc-is-eqv (true-prop-is-contr
                                                               (idfull-fib-is-prop lam-inj-all M) z)
                                                                 (λ _ → z)))
-                                                         (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
-                                                                          (eqv-is-invrt ihNeqv))))
+                                                         (Fin+N-fnc-invrt (equiv-is-invrt ihMeqv)
+                                                                          (equiv-is-invrt ihNeqv))))
                  (λ z → invrt-cmp-rf {f = Fin-=to→ (⟶#app+not-lam N z ⁻¹)}
                                       {inr ∘ Fin+N-fnc (inl ∘ ihMf) (inr ∘ ihNf)}
                                       (Fin-=to→-invrt (⟶#app+not-lam N z ⁻¹))
-                                      (+N₀invrtr z (Fin+N-fnc-invrt (eqv-is-invrt ihMeqv)
-                                                                    (eqv-is-invrt ihNeqv)) ))
+                                      (+N₀invrtr z (Fin+N-fnc-invrt (equiv-is-invrt ihMeqv)
+                                                                    (equiv-is-invrt ihNeqv)) ))
                  Mlam-or-not
           aenm : Fin (⟶# (app M N)) → Σ[ Trm n ] (app M N ⟶_)
           aenm = βapp-stp {n} {M} {N} ∘ aux Mlam-or-not
@@ -1551,7 +1472,7 @@ module Lambda-Calculus where
   ⟶enm : ∀ {n} M → Fin (⟶# M) → Σ[ Trm n ] (M ⟶_)
   ⟶enm M = pj1 (⟶enmex M)
   ⟶enm-invrt : ∀ {n} M → is-invrt (⟶enm {n} M)
-  ⟶enm-invrt M = eqv-is-invrt (pj2 (⟶enmex M))
+  ⟶enm-invrt M = equiv-is-invrt (pj2 (⟶enmex M))
   ⟶enm⁻¹ : ∀ {n} M → ∀ {N} → M ⟶ N → Fin (⟶# {n} M)
   ⟶enm⁻¹ M {N} stp = pj1 (⟶enm-invrt M) (N ,, stp)
   ⟶enm-idFin : ∀ {n} M i → ⟶enm⁻¹ {n} M (pj2 (⟶enm M i)) == i
@@ -1579,7 +1500,7 @@ module Lambda-Calculus where
   ⟶#suc-Σ⟶ : ∀ {n M} → Σ[ Nat ] (λ x → suc x == ⟶# M) → Σ[ Trm n ] (M ⟶_)
   ⟶#suc-Σ⟶ {n} {M} z = ⟶enm M (Fin-suc-is-inhab (pj2 z))
 
-  -- it is decideble wehther a term reduces or not
+  -- it is decideble whether a term reduces or not
   ⟶Cases : ∀ {n} (M : Trm n) → Set
   ⟶Cases {n} M = is-normal M + Σ[ Trm n ] (M ⟶_)
   ⟶cases : ∀ {n} (M : Trm n) → ⟶Cases M

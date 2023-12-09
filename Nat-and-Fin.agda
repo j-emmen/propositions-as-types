@@ -516,8 +516,8 @@ module Nat-and-Fin where
 
   Fin+N-fnc-eqv : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
                     → is-equiv f → is-equiv g → is-equiv (Fin+N-fnc (inl ∘ f) (inr ∘ g))
-  Fin+N-fnc-eqv eqvf eqvg = invrt-is-eqv (Fin+N-fnc-invrt (eqv-is-invrt eqvf)
-                                                          (eqv-is-invrt eqvg))
+  Fin+N-fnc-eqv eqvf eqvg = invrt-is-eqv (Fin+N-fnc-invrt (equiv-is-invrt eqvf)
+                                                          (equiv-is-invrt eqvg))
 
   -- splits a finite set before and after a given element
 
@@ -981,14 +981,6 @@ module Nat-and-Fin where
     where fj≠fi : ∀ j → ¬ (f (faceFin-fun i j) == f i)
           fj≠fi j ff=fi = faceFin.miss i j (finj ff=fi)
 
-{-
-  faceFin-restrinj-tact :  ∀ {n m} (g : Fin n → Fin m) {f : Fin (suc n) → Fin (suc m)}
-                             (finj : is-injective f) (i : Fin (suc n))
-                               → ∀ j → faceFin-fun (f i) (faceFin-restrinj f finj i j) == faceFin-fun (f i) (g j)
-                                       → faceFin-restrinj f finj i j == g j
-  faceFin-restrinj-tact g {f} finj i j = faceFin-inj (f i)
--}
-
   faceFin-restrinj-=pt :  ∀ {n m} {f : Fin (suc n) → Fin (suc m)}
                             (finj : is-injective f) {i i' : Fin (suc n)}
                               → i == i' → ∀ j → faceFin-restrinj f finj i j == faceFin-restrinj f finj i' j
@@ -1291,61 +1283,5 @@ module Nat-and-Fin where
                             (faceFin-restrinj-invrt finj fz finv))
     where finj : is-injective f
           finj = invrt-is-injective finv
-
-
-
-
---   liftFin-any :  ∀ {n m} → (f : Fin n → Fin m) (i : Fin (suc n)) (j : Fin (suc m))
---                    → Σ[ (Fin (suc n) → Fin (suc m)) ] (λ x → (x i == j) × (∀ y → (x ∘ faceFin-fun i) y == (faceFin-fun j ∘ f) y))
---   liftFin-any {n} {m} f i j =
---     (λ x → pj1 (Fin+one-rec i j (faceFin-fun j ∘ f) x))
---     ,, (prj1 (pj2 (Fin+one-rec i j (faceFin-fun j ∘ f) i)) =rf
---        , λ y → prj2 (pj2 (Fin+one-rec i j (faceFin-fun j ∘ f) (faceFin-fun i y))) (y ,, =rf))
-
---   liftFin-any-inj :  ∀ {n m} → (f : Fin n → Fin m) (i : Fin (suc n)) (j : Fin (suc m))
---                        → is-injective f → is-injective (pj1 (liftFin-any f i j))
---   liftFin-any-inj f i j finj {x} {x'} eq =
---     [ (λ i=x → [ i=x ⁻¹ •_
---                 ∣ (λ i≠x' → {!!})
---                 ] (Fin-is-decid i x'))
---     ∣ {!!}
---     ] (Fin-is-decid i x)
-
-
---   -- an injective function between inhabited finite sets
---   -- with the same number of elements is invertible
---   -- (if we include the empty function, the last clause only holds propositionally)
---   inj-Fin=len-is-invrt : ∀ {n m} → n == m → {f : Fin (suc n) → Fin (suc m)}
---                            → is-injective f → is-invrt f
--- --  inj-Fin=len-is-invrt {zero} {m} z=m {f} finj = Fin-=to→ (z=m ⁻¹) ,, {!!}
---   inj-Fin=len-is-invrt {zero} {zero} _ {f} finj =
---     (λ _ → 0₁) ,, ((λ x → pj2 N₁-isContr x ⁻¹) , N₁-isProp (f 0₁))
---   inj-Fin=len-is-invrt {suc n} {suc m} sn=sm {f} finj =
---     fst ,, (iddom , idcod)
---     where n=m : n == m
---           n=m = suc-inj sn=sm 
---           rf : Fin (suc n) → Fin (suc m)
---           rf = faceFin-restrinj f finj fz
---           rf-tr : ∀ j → faceFin-fun (f fz) (rf j) == f (fs j)
---           rf-tr = faceFin-restrinj-tr finj fz
---           rf-inj : is-injective rf
---           rf-inj = faceFin-restrinj-inj finj fz
---           rf-invrt : is-invrt rf
---           rf-invrt = inj-Fin=len-is-invrt n=m rf-inj
---           rf-inv-inj : is-injective (pj1 rf-invrt)
---           rf-inv-inj = invrt-is-injective (rf ,, (prj2 (pj2 rf-invrt) , prj1 (pj2 rf-invrt)))
---           fst : Fin (suc (suc m)) → Fin (suc (suc n))
---           fst = pj1 (liftFin-any (pj1 rf-invrt) (f fz) fz)
---           fst-inj : is-injective fst
---           fst-inj = liftFin-any-inj (pj1 rf-invrt) (f fz) fz rf-inv-inj
---           iddom : ∀ j → fst (f j) == j
---           iddom fz = prj1 (pj2 (liftFin-any (pj1 rf-invrt) (f fz) fz))
---           iddom (fs j) = =proof
---             fst (f (fs j))                  ==[ =ap fst (rf-tr j ⁻¹) ] /
---             fst (faceFin-fun (f fz) (rf j)) ==[ prj2 (pj2 (liftFin-any (pj1 rf-invrt) (f fz) fz)) (rf j) ] /
---             fs (pj1 rf-invrt (rf j))        ==[ =ap fs (prj1 (pj2 rf-invrt) j) ]∎
---             fs j ∎
---           idcod : ∀ i → f (fst i) == i
---           idcod i = fst-inj (iddom (fst i))
 
 -- -- end of file

@@ -77,16 +77,6 @@ module Identity where
     =J (λ _ u → (p₂ : a₂ == a₂') → =ap₂ (λ _ x → x) u p₂ == p₂)
        =ap-id
 
-{-
-  =ap₂-fun1 : ∀ {A₁ A₂ B} (f : A₁ → B)
-                {a₁ a₁'} {a₂ a₂' : A₂} (p₁ : a₁ == a₁') (p₂ : a₂ == a₂')
-                  → =ap₂ (λ x _ → f x) p₁ p₂ == =ap f p₁
-  =ap₂-fun1 f p₁ = {!!}
-  =ap₂-fun2 : ∀ {A₁ A₂ B} (f : A₂ → B)
-                {a₁ a₁' : A₁} {a₂ a₂'} (p₁ : a₁ == a₁') (p₂ : a₂ == a₂')
-                  → =ap₂ (λ _ x → f x) p₁ p₂ == =ap f p₂
-  =ap₂-fun2 f p₁ = {!!}
--}
 
   infix 3 IdOver
   IdOver : ∀ {A} (B : A → Set) {a a'} (p : a == a')
@@ -104,15 +94,6 @@ module Identity where
   =transp₂d : {A : Set} {B : A → Set} (C : ∀ x → B x → Set) → ∀ {a a'} (p : a == a')
                 → ∀ {b b'} → b ==/ b' [ B / p ] → C a b → C a' b'
   =transp₂d {A} {B} C {a} {a'} p {b} pp = =transp (C a') pp ∘ =transp₂v C p b
-
-{-
-  =transp₃d : {A : Set} {B : A → Set} {C : ∀ x → B x → Set} (D : ∀ a b → C a b → Set)
-                 → ∀ {a a'} (p : a == a') {b b'} (pp : b ==/ b' [ B / p ])
-                 → ∀ {c c'} (ppp : c =/ c' [ )
-  =transp₃d {A} {B} C {a} =
-    =J (λ x u → ∀ {b b'} → b ==/ b' [ B / u ] → C a b → C x b')
-       (=transp (C a))
--}
 
   =apd : {A : Set}{B : A → Set}(f : (a : A) → B a){a a' : A}(p : a == a')
             → f a ==/ f a' [ B / p ]
@@ -171,16 +152,11 @@ module Identity where
 
   -- Equational reasoning
 
-  --infix 3 /_==[_]∎_∎
-  --infix  3 _∎
   infixr 2 /_==[_]_
   infixr 1 =proof_==[_]_
 
   =proof_==[_]_ : {A : Set}(a₁ {a₂ a₃} : A) → a₁ == a₂ → a₂ == a₃ → a₁ == a₃
   =proof a ==[ pf ] pf' = =tra pf pf'
-
-  --_∎ : {A : Set}(a : A) → a == a
-  --a ∎ = =rf
 
   /_==[_]_ : {A : Set}(a₁ {a₂ a₃} : A) → a₁ == a₂ → a₂ == a₃ → a₁ == a₃
   / a₁ ==[ pf ] pf' = =tra pf pf'
@@ -243,7 +219,6 @@ module Identity where
   •ass p₁ p₂ p₃ = •tr _ p₂ p₃ p₁
 
   •ass⁻¹ : {A : Set}{a₁ a₂ a₃ a₄ : A}(p₁ : a₁ == a₂)(p₂ : a₂ == a₃)(p₃ : a₃ == a₄)
-  --(p₁ : a₁ == a₂)(p₂ : a₂ == a₃)(p₃ : a₃ == a₄)
              → (p₁ • p₂) • p₃ == p₁ • (p₂ • p₃)
   •ass⁻¹ p₁ p₂ p₃ = •ass p₁ p₂ p₃ ⁻¹
 
@@ -321,16 +296,16 @@ module Identity where
                                                p₃ ∎
 
 
-  •lc : {A : Set}{a₁ a₂ : A}{p : a₁ == a₂}{a₃ : A}{p₁ : a₂ == a₃}{p₂ : a₂ == a₃}
+  •lc : {A : Set}{a₁ a₂ a₃ : A}{p : a₁ == a₂}{p₁ p₂ : a₂ == a₃}
             → p • p₁ == p • p₂ → p₁ == p₂
-  •lc {p = p} {_} {p₁} {p₂} h = =proof p₁           ==[ (•idl p₁ ⁻¹ • •extr p₁ (•invl p ⁻¹)) • •ass⁻¹ _ _ p₁ ] /
+  •lc {p = p} {p₁} {p₂} h = =proof p₁               ==[ (•idl p₁ ⁻¹ • •extr p₁ (•invl p ⁻¹)) • •ass⁻¹ _ _ p₁ ] /
                                    p ⁻¹ • p • p₁    ==[ •extl (p ⁻¹) h ] /
                                    p ⁻¹ • p • p₂    ==[ •ass _ _ p₂ • •extr p₂ (•invl p) • •idl p₂ ]∎
                                    p₂ ∎
 
-  •rc : {A : Set}{a₁ a₂ a₃ : A}{p : a₂ == a₃}{a₁ : A}{p₁ : a₁ == a₂}{p₂ : a₁ == a₂}
+  •rc : {A : Set}{a₁ a₂ a₃ : A}{p : a₂ == a₃}{p₁ p₂ : a₁ == a₂}
             → p₁ • p == p₂ • p → p₁ == p₂
-  •rc {p = p} {_} {p₁} {p₂} h = =proof p₁           ==[ •idr p₁ ⁻¹ • •extl p₁ (•invr p ⁻¹) ] /
+  •rc {p = p} {p₁} {p₂} h = =proof p₁               ==[ •idr p₁ ⁻¹ • •extl p₁ (•invr p ⁻¹) ] /
                                    p₁ • p • p ⁻¹    ==[ •ass _ _ (p ⁻¹)  • •extr (p ⁻¹) h • •ass⁻¹ _ _ (p ⁻¹)  ] /
                                    p₂ • p • p ⁻¹    ==[ •extl p₂ (•invr p) • •idr p₂ ]∎
                                    p₂ ∎
@@ -400,15 +375,6 @@ module Identity where
           JElrf : JEl a =rf
           JElrf = =ptw
 
-  {-
-  -- transport of fibrewise functions is pointwise
-  ●ptw : {A : Set}{B C : A → Set}(f : (a : A) → B a → C a)
-         {a a' : A}(p : a == a')(b : B a')
-            → ((λ x → B x → C x) ● p) (f a) b == (C ● p) (f a ((B ● p ⁻¹) b))
-  ●ptw f p b = let ψ : _
-                   ψ = {!!}
-               in {!!}
-  -}
 
   -- identities of composition
 
@@ -434,13 +400,6 @@ module Identity where
   =transp-precmp-inv {a₃ = a₃} p q = =J (λ x u → ((_== a₃) ● u) q == u ⁻¹ • q)
                                         (•idl q ⁻¹)
                                         p
-
-{-
-  =/transp-precmp-inv : {A : Set} {B : A → Set} {a₁ a₂ a₃ : A} (p : a₂ == a₁) (q : a₂ == a₃)
-                      → ∀ {b₁ b₂ b₃} (pp : b₂ ==/ b₁ [ B / p ]) (qq : b₂ ==/ b₃ [ B / q ])
-                          → {!() qq!} --(? ● pp) qq == =/cmp (p ⁻¹) q (=/inv p pp) qq
-  =/transp-precmp-inv {a₃ = a₃} = {!!}
--}
 
   =transp-ext : {A : Set}(B : A → Set){a a' : A}{p p' : a == a'}
                   → p == p' → B ● p == B ● p'
@@ -570,13 +529,6 @@ module Identity where
                                      ==[ =transp-precmp-inv (=ptw (=ap (B ●_) eq) b) _  ]∎
     =ptw (=ap (B ●_) eq) b ⁻¹ • pp ∎
 
-  -- =/ext eq pp                   = ((λ u → b ==/ b' [ B / u ]) ● eq) pp
-  --                               = ((λ u → (B ● u) b == b') ● eq) pp
-  --                               == ((_== b') ● =ptw (=ap (B ●_) eq) b) pp
-  -- =transp-ext-ptw B (eq ⁻¹) b   = ptw (=ap (=transp B) (eq ⁻¹)) b
-  --                               = =ap (λ x → x b) (=ap (=transp B) (eq ⁻¹))
-  --                               = =ap ((λ x → x b) ∘ =transp B) (eq ⁻¹)
-
 
   ---------------------------------
   -- Identities of inductive types
@@ -651,12 +603,11 @@ module Identity where
   =Σover :  ∀ {A} {B : A → Set} {z : Σ[ A ] B}
                → ∀ {b} → b == pj2 z → pj1 z ,, b == z
   =Σover {A} {B} {z} eq = =Σover,, B {pj1 z} eq • Ση z
-    -- =J (λ w _ → pj1 z ,, w == z) (Ση z)
 
   =Σover⁻¹ :  ∀ {A} {B : A → Set} {z : Σ[ A ] B}
                → ∀ {b} → pj2 z == b → z == pj1 z ,, b
   =Σover⁻¹ {z = z} eq = Ση⁻¹ z • =Σover,, _ {pj1 z} eq
-    -- =J (λ w _ → z == pj1 z ,, w) (Ση⁻¹ z)
+
   =pj1=Σover⁻¹=rf : ∀ {A} {B : A → Set} (z : Σ[ A ] B) → ∀ {b} (q : pj2 z == b)
                           → =pj1 {z = z} (=Σover⁻¹ q) == =rf
   =pj1=Σover⁻¹=rf {A} {B} z =rf = =pj1Ση⁻¹=rf z
@@ -811,6 +762,9 @@ module Identity where
   isContr→isProp : {A : Set} → isContr A → isProp A
   isContr→isProp cnt = λ a a' → contr= cnt a • contr= cnt a' ⁻¹
 
+  isProp→isContr : {A : Set} → isProp A → A → isContr A
+  isProp→isContr prp a = a ,, λ x → prp x a
+
   N₁-isProp : isProp N₁
   N₁-isProp = isContr→isProp N₁-isContr
 
@@ -886,7 +840,7 @@ module Identity where
   -------------
 
   UIP UIPrf  : (A : Set) → Set
-  UIP = isSet --{a a' : A} → is-subsing (a == a')-- (u u' : a == a') → u == u'
+  UIP = isSet
   UIPrf A = {a : A} (u : a == a) → u == =rf
 
   UIP→UIPrf : {A : Set} → UIP A → UIPrf A
@@ -903,7 +857,7 @@ module Identity where
           D x = R a x → a == x
           q : (D ● p) (R→== a a) == R→== a a
           q = =apd {B = D} (R→== a) p
-          q' : (e : R a a) → ((_==_ a) ● p) (R→== a a e) == R→== a a e --(((R a) ● p) e)
+          q' : (e : R a a) → ((_==_ a) ● p) (R→== a a e) == R→== a a e
           q' e = HoTTLemma2-9-6 p q e • =ap (R→== a a) (Risprop a a _ _)
 
 
@@ -1036,25 +990,64 @@ module Identity where
           fg=idB : ∀ b → f (g b) == b
           fg=idB b = pj2 (pj1 (eqvf b))
 
-  -- using ∀-is-prop
+  -- using `∀-is-prop` (and `FunExt`)
   is-equiv-is-Prop : ∀ {A B f} → isProp (is-equiv {A} {B} f)
   is-equiv-is-Prop {A} {B} {f} = ∀-is-prop (λ b → isContr (fib f b))
                                            (λ b → isContr-is-prop (fib f b))
 
+  
+  -- surjective functions
+  is-surjective :  {A B : Set} → (A → B) → Set
+  is-surjective f = ∀ b → fib f b
 
+  surjective-cmp : {A B C : Set} {f : A → B} {g : B → C}
+                     → is-surjective f → is-surjective g → is-surjective (g ∘ f)
+  surjective-cmp {A} {B} {C} {f} {g} fsj gsj c =
+    pj1 (fsj b)
+    ,, =ap g (pj2 (fsj b)) • pj2 (gsj c)
+    where b : B
+          b = pj1 (gsj c)
+  surjective-tr : {A B C : Set} {f : A → B} {g : B → C} {h : A → C}
+                     → (∀ {a} → g (f a) == h a) → is-surjective h
+                          → is-surjective g
+  surjective-tr {A} {B} {C} {f} {g} {h} tr hsj c =
+    f a
+    ,, tr • pj2 (hsj c)
+    where a : A
+          a = pj1 (hsj c)
+  
+  -- invertible functions
   is-iso-pair : ∀ {A B} → (f : A → B) → (g : B → A) → Set
   is-iso-pair f g = (∀ a → g (f a) == a) × (∀ b → f (g b) == b)
   is-adj-iso-pair : ∀ {A B} → (f : A → B) → (g : B → A) → Set
   is-adj-iso-pair f g = Σ[ (∀ a → g (f a) == a) × (∀ b → f (g b) == b) ]
                            (λ ii → (∀ a → =ap f (prj1 ii a) == prj2 ii (f a))
                                     × (∀ b → =ap g (prj2 ii b) == prj1 ii (g b)) )
+  module adjiso {A B} {f : A → B} {g : B → A}(adjiso : is-adj-iso-pair f g) where
+    ζ : ∀ a → g (f a) == a
+    ζ = prj1 (pj1 adjiso)
+    ξ : ∀ b → f (g b) == b
+    ξ = prj2 (pj1 adjiso)
+    fζ=ξf : ∀ a → =ap f (ζ a) == ξ (f a)
+    fζ=ξf = prj1 (pj2 adjiso)
+    gξ=ζg : ∀ b → =ap g (ξ b) == ζ (g b)
+    gξ=ζg = prj2 (pj2 adjiso)
+  adjiso-is-iso : ∀ {A B} {f : A → B} {g : B → A} → is-adj-iso-pair f g → is-iso-pair f g
+  adjiso-is-iso = pj1
   is-invrt : ∀ {A B} → (f : A → B) → Set
   is-invrt {A} {B} f = Σ[ (B → A) ] (is-iso-pair f)
   is-adj-invrt : ∀ {A B} → (f : A → B) → Set
   is-adj-invrt {A} {B} f = Σ[ (B → A) ] (is-adj-iso-pair f)
-  is-idfull : ∀ {A B} (f : A → B) → Set
-  is-idfull f = ∀ {a a'} (p : f a == f a') → Σ[ a == a' ] (λ x → =ap f x == p)
+  module adjinv  {A B} {f : A → B} (adjinv : is-adj-invrt f)
+                 = adjiso (pj2 adjinv)
+  adjinv-is-inv : ∀ {A B} {f : A → B} → is-adj-invrt f → is-invrt f
+  adjinv-is-inv = ⟨ pj1 ∣∣ (λ x → adjiso-is-iso (pj2 x)) ⟩
 
+  -- functions full in identities
+  is-idfull : ∀ {A B} (f : A → B) → Set
+  is-idfull f = ∀ {a a'} → is-surjective (=ap f {a} {a'})
+
+  -- some invertible functions
   id-is-invrt : ∀ {A} → is-invrt (id {A})
   id-is-invrt {A} = id ,, ((λ _ → =rf) , (λ _ → =rf))
   =id-is-invrt : ∀ {A} {f : A → A} → (∀ a → f a == a) → is-invrt f
@@ -1062,12 +1055,44 @@ module Identity where
   =invrt-is-invrt : ∀ {A B} {f g : A → B} → (∀ a → f a == g a) → is-invrt g → is-invrt f
   =invrt-is-invrt {A} {B} {f} {g} pf ginv = pj1 ginv ,, ((λ a → =ap (pj1 ginv) (pf a) • prj1 (pj2 ginv) a)
                                                          , λ b → pf _ • prj2 (pj2 ginv) b)
-
   =transp-is-invrt : {A : Set}(B : A → Set){a a' : A} (p : a == a')
                         → is-invrt (B ● p)
   =transp-is-invrt {A} B p =
     B ● (p ⁻¹) ,, (=transp-forth-back-ptw B p , =transp-back-forth-ptw B p)
+  equiv-is-invrt : ∀ {A B} {f : A → B} → is-equiv f → is-invrt f
+  equiv-is-invrt {A} {B} {f} eqvf = g ,, (gf=idA , fg=idB)
+    where g : B → A
+          g b = pj1 (pj1 (eqvf b))
+          gf=idA : ∀ a → g (f a) == a
+          gf=idA a = =pj1 ((pj2 (eqvf (f a))) (a ,, =rf)) ⁻¹
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB b = pj2 (pj1 (eqvf b))
+  +N₀invrtr : {A B O : Set} {f : A → B} (k : O → N₀)
+              → is-invrt f → is-invrt {A} {O + B} (inr ∘ f)
+  +N₀invrtr {A} {B} {O} {f} k invf =
+    [ N₀ind ∘ k ∣ g ]
+    ,, (gf=idA
+    , +ind (λ v → (inr ∘ f) ([ N₀ind ∘ k ∣ pj1 invf ] v) == v)
+           (λ o → N₀ind {λ _ →  inr (f (N₀ind (k o))) == inl o} (k o))
+           λ b → =ap inr (fg=idB b))
+    where g : B → A
+          g = pj1 invf
+          gf=idA : ∀ a → g (f a) == a
+          gf=idA = prj1 (pj2 invf)
+          fg=idB : ∀ b → f (g b) == b
+          fg=idB = prj2 (pj2 invf)
 
+  -- invertible functions and equivalences are surjective
+  invrt-is-surjective : ∀ {A B} {f : A → B} → is-invrt f → is-surjective f
+  invrt-is-surjective {A} {B} {f} finv b =
+    pj1 finv b
+    ,, prj2 (pj2 finv) b
+  adj-invrt-is-surjective : ∀ {A B} {f : A → B} → is-adj-invrt f → is-surjective f
+  adj-invrt-is-surjective = invrt-is-surjective ∘ adjinv-is-inv
+  equiv-is-surjective : ∀ {A B} {f : A → B} → is-equiv f → is-surjective f
+  equiv-is-surjective eqv b = pj1 (eqv b)
+
+  -- the main lemma on functions full on identities
   idfull-fib-is-prop : ∀ {A B} {f : A → B} → is-idfull f
                          → ∀ b → isProp (fib f b)
   idfull-fib-is-prop {A} {B} {f} fullf b z z' =
@@ -1086,8 +1111,12 @@ module Identity where
               (pj2 z' ⁻¹) ⁻¹ • pj2 z ⁻¹ • pj2 z
                                         ==[ •idrg-inv (•invl (pj2 z)) (⁻¹⁻¹=id (pj2 z')) ]∎
               pj2 z' ∎
+  -- with its theorem
+  surj+idfull-is-equiv : ∀ {A B} {f : A → B} → is-surjective f → is-idfull f → is-equiv f
+  surj+idfull-is-equiv {A} {B} {f} fsj fif b =
+    isProp→isContr (idfull-fib-is-prop fif b) (fsj b)
   
-
+  -- compositions of invertible functions
   invrt-cmp-rf : ∀ {A B C} {f : A → B}{g : B → C}
                  → is-invrt f → is-invrt g → is-invrt (g ∘ f)
   invrt-cmp-rf {A} {B} {C} {f} {g} invf invg =
@@ -1166,31 +1195,41 @@ module Identity where
             g' (g b)                  ==[ g'g=idB b ]∎
             b ∎
 
+  -- every adjoint-invertible map is full on identities
+  
+  adj-invrt-is-idfull : ∀ {A B} {f : A → B} → is-adj-invrt f → is-idfull f
+  adj-invrt-is-idfull {A} {B} {f} adjinv {a} {a'} q =
+    p ,, fp=q
+    where module f = adjinv adjinv
+          g : B → A
+          g = pj1 adjinv
+          p : a == a'
+          p = f.ζ a ⁻¹ • =ap g q • f.ζ a'
+          fp=q : =ap f p == q
+          fp=q = =proof =ap f p
+                              ==[ =ap• f _ (=ap g q • f.ζ a') • •extl _ (=ap• f _ (f.ζ a')) ] /
+                         =ap f (f.ζ a ⁻¹) • =ap f (=ap g q) • =ap f (f.ζ a')
+                              ==[ •extlr (=proof
+                         =ap f (f.ζ a ⁻¹)
+                              ==[ ⁻¹=ap f (f.ζ a) ] /
+                         =ap f (f.ζ a) ⁻¹
+                              ==[ =ap _⁻¹ (f.fζ=ξf a) ]∎
+                         f.ξ (f a) ⁻¹ ∎)
+                                         (=proof
+                                         =ap f (=ap g q) • =ap f (f.ζ a')
+                                                        ==[ •extlr (=ap∘ g f q) (f.fζ=ξf a') ] /
+                                         =ap (f ∘ g) q • f.ξ (f a')
+                                                                      ==[ ==-is-nat-id f.ξ q ]∎
+                                         f.ξ (f a) • q ∎) ] /
+                         f.ξ (f a) ⁻¹ • f.ξ (f a) • q
+                              ==[ •ass _ _ q • •idlg-inv (•invl (f.ξ _)) =rf ]∎
+                         q ∎
 
-  eqv-is-invrt : ∀ {A B} {f : A → B} → is-equiv f → is-invrt f
-  eqv-is-invrt {A} {B} {f} eqvf = g ,, (gf=idA , fg=idB)
-    where g : B → A
-          g b = pj1 (pj1 (eqvf b))
-          gf=idA : ∀ a → g (f a) == a
-          gf=idA a = =pj1 ((pj2 (eqvf (f a))) (a ,, =rf)) ⁻¹
-          fg=idB : ∀ b → f (g b) == b
-          fg=idB b = pj2 (pj1 (eqvf b))
-
-  +N₀invrtr : {A B O : Set} {f : A → B} (k : O → N₀)
-              → is-invrt f → is-invrt {A} {O + B} (inr ∘ f)
-  +N₀invrtr {A} {B} {O} {f} k invf =
-    [ N₀ind ∘ k ∣ g ]
-    ,, (gf=idA
-    , +ind (λ v → (inr ∘ f) ([ N₀ind ∘ k ∣ pj1 invf ] v) == v)
-           (λ o → N₀ind {λ _ →  inr (f (N₀ind (k o))) == inl o} (k o))
-           λ b → =ap inr (fg=idB b))
-    where g : B → A
-          g = pj1 invf
-          gf=idA : ∀ a → g (f a) == a
-          gf=idA = prj1 (pj2 invf)
-          fg=idB : ∀ b → f (g b) == b
-          fg=idB = prj2 (pj2 invf)
-          
+  -- and thus that every adjoint-invertible map is an equivalence
+  adj-invrt-is-eqv : ∀ {A B} {f : A → B} → is-adj-invrt f → is-equiv f
+  adj-invrt-is-eqv {A} {B} {f} adjinv =
+    surj+idfull-is-equiv (adj-invrt-is-surjective adjinv)
+                         (adj-invrt-is-idfull adjinv)
 
   -- every invertible function is adjoint-invertible
   iso-pair-is-adj : ∀ {A B} {f : A → B}{g : B → A}
@@ -1202,7 +1241,7 @@ module Identity where
       fg=idB : ∀ b → f (g b) == b
       fg=idB = prj2 isiso
       fg=idB-adj : ∀ b → f (g b) == b
-      fg=idB-adj b = =proof -- fg=idB (f (g b)) ⁻¹ • =ap f (gf=idA (g b)) • fg=idB b
+      fg=idB-adj b = =proof
         f (g b)            ==[ fg=idB (f (g b)) ⁻¹ ] /
         f (g (f (g b)))    ==[ =ap f (gf=idA (g b)) ] /
         f (g b)            ==[ fg=idB b ]∎
@@ -1212,21 +1251,9 @@ module Identity where
       fg-aux₁ : ∀ b → =ap (f ∘ g) (fg=idB b) • fg=idB b == fg=idB (f (g b)) • fg=idB b
       fg-aux₁ b = ==-is-nat-id fg=idB (fg=idB b)
       gf-aux₂ : ∀ a → =ap (g ∘ f) (gf=idA a) == gf=idA (g (f a))
-      gf-aux₂ a = =proof
-        =ap (g ∘ f) (gf=idA a)                             ==[ •idrg-inv (•invr (gf=idA a)) =rf ⁻¹ ] /
-        =ap (g ∘ f) (gf=idA a) • gf=idA a • gf=idA a ⁻¹    ==[ •ass _ (gf=idA a) (gf=idA a ⁻¹)
-                                                            • •extr (gf=idA a ⁻¹) (gf-aux₁ a)
-                                                            • •ass⁻¹ _ (gf=idA a) (gf=idA a ⁻¹) ] /
-        gf=idA (g (f a)) • gf=idA a • gf=idA a ⁻¹          ==[ •idrg-inv (•invr (gf=idA a)) =rf ]∎
-        gf=idA (g (f a)) ∎
+      gf-aux₂ a = •rc {p = gf=idA a} (gf-aux₁ a)
       fg-aux₂ : ∀ b → =ap (f ∘ g) (fg=idB b) == fg=idB (f (g b))
-      fg-aux₂ b = =proof
-        =ap (f ∘ g) (fg=idB b)                             ==[ •idrg-inv (•invr (fg=idB b)) =rf ⁻¹ ] /
-        =ap (f ∘ g) (fg=idB b) • fg=idB b • fg=idB b ⁻¹    ==[ •ass _ (fg=idB b) (fg=idB b ⁻¹)
-                                                            • •extr (fg=idB b ⁻¹) (fg-aux₁ b)
-                                                            • •ass⁻¹ _ (fg=idB b) (fg=idB b ⁻¹) ] /
-        fg=idB (f (g b)) • fg=idB b • fg=idB b ⁻¹          ==[ •idrg-inv (•invr (fg=idB b)) =rf ]∎
-        fg=idB (f (g b)) ∎
+      fg-aux₂ b = •rc {p = fg=idB b} (fg-aux₁ b)
 
       eq1-aux1 : ∀ a → fg=idB (f (g (f a))) • =ap f (gf=idA a) == =ap f (gf=idA (g (f a))) • fg=idB (f a)
       eq1-aux1 a = =proof
@@ -1279,100 +1306,25 @@ module Identity where
                 • •idlg-inv (•invl (=ap g (fg=idB (f (g b))))) =rf ]∎
         gf=idA (g b) ∎
 
-
   invrt-is-adj : ∀ {A B} {f : A → B} → is-invrt f → is-adj-invrt f
   invrt-is-adj inv = pj1 inv ,, iso-pair-is-adj (pj2 inv)
 
-
-  -- every adjoint-invertible map is full on identities
-  adj-invrt-is-full : ∀ {A B} {f : A → B} → is-adj-invrt f → is-idfull f
-  adj-invrt-is-full {A} {B} {f} adjinv {a} {a'} p =
-    eqA ,, (=proof
-    =ap f eqA            ==[ =ap• f (gf=idA a ⁻¹) (=ap g p • gf=idA a')  ] /
-    =ap f (gf=idA a ⁻¹) • =ap f (=ap g p • gf=idA a') ==[ •extlr (=ap-sym f (gf=idA a))
-                                                                 (=ap• f (=ap g p) (gf=idA a'))  ] /
-    =ap f (gf=idA a) ⁻¹ • =ap f (=ap g p) • =ap f (gf=idA a') ==[ •extl (=ap f (gf=idA a) ⁻¹) eqp ] /
-    =ap f (gf=idA a) ⁻¹ • =ap f (gf=idA a) • p ==[  •ass _ (=ap f (gf=idA a)) p
-                                                 • •idlg-inv (•invl (=ap f (gf=idA a))) =rf ]∎
-    p ∎)
-    where
-      g : B → A
-      g = pj1 adjinv
-      gf=idA : ∀ a → g (f a) == a
-      gf=idA = prj1 (pj1 (pj2 adjinv))
-      fg=idB : ∀ b → f (g b) == b
-      fg=idB = prj2 (pj1 (pj2 adjinv))
-      tr1 : ∀ x → =ap f (gf=idA x) == fg=idB (f x)
-      tr1 = prj1 (pj2 (pj2 adjinv))
-      tr2 : ∀ b → =ap g (fg=idB b) == gf=idA (g b)
-      tr2 = prj2 (pj2 (pj2 adjinv))
-      eqA : a == a'
-      eqA = =proof
-        a               ==[ gf=idA a ⁻¹ ] /
-        g (f a)         ==[ =ap g p ] /
-        g (f a')        ==[ gf=idA a' ]∎
-        a' ∎
-      eqp : =ap f (=ap g p) • =ap f (gf=idA a') == =ap f (gf=idA a) • p
-      eqp = =proof
-        =ap f (=ap g p) • =ap f (gf=idA a')    ==[ •extlr (=ap∘ g f p) (tr1 a') ] /
-        =ap (f ∘ g) p • fg=idB (f a')          ==[ ==-is-nat-id fg=idB p ] /
-        fg=idB (f a) • p                      ==[ •extr p (tr1 a ⁻¹) ]∎
-        =ap f (gf=idA a) • p ∎
-
-  -- it follows that every invertible map is full on identities too
-  invrt-is-full : ∀ {A B} {f : A → B} → is-invrt f → is-idfull f
-  invrt-is-full {A} {B} {f} inv = adj-invrt-is-full (invrt-is-adj inv)
-
-  -- and that every adjoint-invertible map is an equivalence
-  adj-invrt-is-eqv : ∀ {A B} {f : A → B} → is-adj-invrt f → is-equiv f
-  adj-invrt-is-eqv {A} {B} {f} adjinv b =
-    (g b ,, fg=idB b)
-    ,, snd
-    where g : B → A
-          g = pj1 adjinv
-          gf=idA : ∀ x → g (f x) == x
-          gf=idA = prj1 (pj1 (pj2 adjinv))
-          fg=idB : ∀ y → f (g y) == y
-          fg=idB = prj2 (pj1 (pj2 adjinv))
-          tr1 : ∀ x → =ap f (gf=idA x) == fg=idB (f x)
-          tr1 = prj1 (pj2 (pj2 adjinv))
-          tr2 : ∀ y → =ap g (fg=idB y) == gf=idA (g y)
-          tr2 = prj2 (pj2 (pj2 adjinv))
-          fbase : (z : fib f b) → f (pj1 z) == f (g b)
-          fbase z = =proof
-            f (pj1 z)      ==[ pj2 z ] /
-            b              ==[ fg=idB b ⁻¹ ]∎
-            f (g b) ∎
-          base : (z : fib f b) → pj1 z == g b
-          base z = pj1 (adj-invrt-is-full adjinv (fbase z))
-          fbase-eq : (z : fib f b) → =ap f (base z) == fbase z
-          fbase-eq z = pj2 (adj-invrt-is-full adjinv (fbase z))
-          aux : (z : fib f b) → =ap f (base z ⁻¹) == (fg=idB b ⁻¹) ⁻¹ • pj2 z ⁻¹
-          aux z = =proof
-            =ap f (base z ⁻¹)                ==[ ⁻¹=ap f (base z) ] /
-            =ap f (base z) ⁻¹                ==[ =ap _⁻¹ (fbase-eq z) ] /
-            (pj2 z • fg=idB b ⁻¹) ⁻¹         ==[ •⁻¹ (pj2 z) (fg=idB b ⁻¹) ]∎
-            (fg=idB b ⁻¹) ⁻¹ • pj2 z ⁻¹ ∎
-          snd : (z : fib f b) → z == g b ,, fg=idB b
-          snd z = =Σchar,, (base z) (=proof
-            ((λ x → f x == b) ● base z) (pj2 z)    ==[ =transp-fib-inv z (base z) ] /
-            =ap f (base z ⁻¹) • pj2 z               ==[ •extr (pj2 z) (aux z)
-                                                      • •ass⁻¹ _ (pj2 z ⁻¹) (pj2 z) ] /
-            (fg=idB b ⁻¹) ⁻¹ • pj2 z ⁻¹ • pj2 z      ==[ •idrg-inv (•invl (pj2 z))
-                                                                  (⁻¹⁻¹=id (fg=idB b)) ]∎
-            fg=idB b ∎)
-
+  -- thus invertible maps are idfull and equivalences
+  invrt-is-idfull : ∀ {A B} {f : A → B} → is-invrt f → is-idfull f
+  invrt-is-idfull {A} {B} {f} inv = adj-invrt-is-idfull (invrt-is-adj inv)
 
   invrt-is-eqv : ∀ {A B} {f : A → B} → is-invrt f → is-equiv f
   invrt-is-eqv {A} {B} {f} inv = adj-invrt-is-eqv (invrt-is-adj inv)
 
+  -- equivalences are thus closed under composition
+  -- (probably not the best proof though)
   ∘eqv : {A B C : Set}{f : A → B}{g : B → C}
              → is-equiv f → is-equiv g → is-equiv (g ∘ f)
   ∘eqv {A} {B} {C} {f} {g} eqvf eqvg = invrt-is-eqv (invrt-cmp-rf invf invg)
     where invf : is-invrt f
-          invf = eqv-is-invrt eqvf
+          invf = equiv-is-invrt eqvf
           invg : is-invrt g
-          invg = eqv-is-invrt eqvg
+          invg = equiv-is-invrt eqvg
 
   prop-eqv : ∀ {A B} (f : A → B) → isProp A → isProp B → (B → A)
                → is-equiv f
@@ -1385,7 +1337,7 @@ module Identity where
     where f : A → B
           f = pj1 eqv
           inv : is-invrt f
-          inv = eqv-is-invrt (pj2 eqv)
+          inv = equiv-is-invrt (pj2 eqv)
           g : B → A
           g = pj1 inv
           gf=idA : ∀ a → g (f a) == a
@@ -1538,7 +1490,7 @@ module Identity where
   =Σeqv⁻¹ {A} {B} z z' =
     (λ uu → =Σchar (pj1 uu) (pj2 uu)) ,, invrt-is-eqv (=Σchar-is-invrt z z')
 
-  -- as a consequence, sets are closed under Σ-types (since props are)
+  -- as a consequence, props and sets are closed under Σ-types
   Σpp-is-prop : ∀ {A} {B : A → Set} → isProp A → (∀ a → isProp (B a)) → isProp (Σ[ A ] B)
   Σpp-is-prop {A} {B} prpA prpB z z' = =proof
     z                  ==[ Ση⁻¹ z ] /
@@ -1691,31 +1643,6 @@ module Identity where
   invrt-is-injective {A} {B} {f} finv eq = prj1 (pj2 finv) _ ⁻¹ • =ap (pj1 finv) eq • prj1 (pj2 finv) _
   isid-is-injective : ∀ {A} {f : A → A} → (∀ x → f x == x) → is-injective f
   isid-is-injective isid {a} {a'} e = isid a ⁻¹ • e • isid a'
-
-  is-surjective :  {A B : Set} → (A → B) → Set
-  is-surjective f = ∀ b → fib f b
-
-  surjective-cmp : {A B C : Set} {f : A → B} {g : B → C}
-                     → is-surjective f → is-surjective g → is-surjective (g ∘ f)
-  surjective-cmp {A} {B} {C} {f} {g} fsj gsj c =
-    pj1 (fsj b)
-    ,, =ap g (pj2 (fsj b)) • pj2 (gsj c)
-    where b : B
-          b = pj1 (gsj c)
-  surjective-tr : {A B C : Set} {f : A → B} {g : B → C} {h : A → C}
-                     → (∀ {a} → g (f a) == h a) → is-surjective h
-                          → is-surjective g
-  surjective-tr {A} {B} {C} {f} {g} {h} tr hsj c =
-    f a
-    ,, tr • pj2 (hsj c)
-    where a : A
-          a = pj1 (hsj c)
-  invrt-is-surjective : ∀ {A B} {f : A → B} → is-invrt f → is-surjective f
-  invrt-is-surjective {A} {B} {f} finv b =
-    g b
-    ,, prj2 (pj2 finv) b
-    where g : B → A
-          g = pj1 finv
 
   inj+surj-is-invrt : ∀ {A B} {f : A → B} → is-injective f → is-surjective f → is-invrt f
   inj+surj-is-invrt {f = f} fij fsj =
