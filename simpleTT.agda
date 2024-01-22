@@ -34,6 +34,9 @@ module simpleTT (A : Set) where
   varty : ∀ Γ i → Γ ∋ i ∶ pr Γ i
   varty (R ∣ Γ) fz = here
   varty (R ∣ Γ) (fs i) = there (varty Γ i)
+  vartypr : ∀ {Γ i T} → Γ ∋ i ∶ T → pr Γ i == T
+  vartypr here = =rf
+  vartypr (there inc) = vartypr inc
 
   -- typing judgements
   infix 10 _⊢_∶_
@@ -416,105 +419,109 @@ module simpleTT (A : Set) where
   -- the second clause quantifies over all `k : Nat` and `N : Trm (k +N n)`
   -- as I am not able to prove that red-cand is invariant under weakening otherwise
 
-  -- quite useless functions
-  rc-atm : ∀ {n M} {a : A} → isStrNrm {n} M → red-cand M (atm a)
-  rc-atm nrm = nrm
-  rc-⇒ : ∀ {n M T S} → (∀ k {N} → red-cand N T → red-cand (app (ext[ k ] {n} M) N) S)
-              → red-cand M (T ⇒ S)
-  rc-⇒ rcapp = rcapp
-  rc-ind : (C : ∀ {n M T} → red-cand {n} M T → Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C (rc-atm {a = a} nrm))
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C {T = T ⇒ S} (rc-⇒ fnc))
-                → ∀ {n M T} → (rc : red-cand {n} M T) → C rc
-  rc-ind C Catm Cfnc {T = atm a} = Catm {a = a}
-  rc-ind C Catm Cfnc {T = T ⇒ S} = Cfnc
-  rc-rec : (C : Set)
-              → (∀ {n M a} → (nrm : red-cand {n} M (atm a)) → C)
-              → (∀ {n M T S} → (fnc : red-cand {n} M (T ⇒ S)) → C)
-                → ∀ {n M T} → (rc : red-cand {n} M T) → C
-  rc-rec C = rc-ind (λ _ → C)
+  -- the three fundamental properties of reducibility candidates
+  red-candStrNrm : ∀ {n} → Trm n → Ty → Set
+  red-candStrNrm M T = red-cand M T → isStrNrm M
+  red-candDwnCl : ∀ {n} → Trm n → Ty → Set
+  red-candDwnCl M T = red-cand M T → ∀ {N} → M ⟶ N → red-cand N T
+  red-candUpCl : ∀ {n} → Trm n → Ty → Set
+  red-candUpCl M T = is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T
 
-
-  -- the three main properties of reducibility candidates
-  
-  red-cand-Props : ∀ {n} → Trm n → Ty → Set
-  red-cand-Props M T = (red-cand M T → isStrNrm M)
-                       × (red-cand M T → ∀ {N} → M ⟶ N → red-cand N T)
-                       × (is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T)
-
-  red-cand-props : ∀ {n} M T → red-cand-Props {n} M T
-
+  red-cand-props : ∀ {n} M T → red-candStrNrm M T × red-candDwnCl M T × red-candUpCl M T
   red-cand-props {n} M (atm a) =
       id
     , (λ nrm {N} → strnrm-⟶ {N = N} nrm)
     , λ _ → strnrm-stp-any {n} {M}
-
   red-cand-props {n} M (T ⇒ S) =
-    CR1
-    , CR2
-    , CR3
-    where nrmaux : ∀ {N} → red-cand (app M N) S → isStrNrm (app M N)
-          nrmaux {N} = prj1 (red-cand-props (app M N) S)          
+    RC1
+    , RC2
+    , RC3
+    where rc1 : ∀ {k} P R → red-candStrNrm {k} P R
+          rc1 P R = prj1 (red-cand-props P R)
+          rc2 : ∀ {k} P R → red-candDwnCl {k} P R
+          rc2 P R = prj1 (prj2 (red-cand-props P R))
+          rc3 : ∀ {k} P R → red-candUpCl {k} P R
+          rc3 P R = prj2 (prj2 (red-cand-props P R))
+          nrmaux : ∀ {N} → red-candStrNrm (app M N) S --red-cand (app M N) S → isStrNrm (app M N)
+          nrmaux {N} = rc1 (app M N) S
           strnrmₗₑᵥ-appvar : ∀ {k} → isStrNrmₗₑᵥ k (app (ext M) (var fz)) → isStrNrmₗₑᵥ k M
           strnrmₗₑᵥ-appvar snw = strnrmₗₑᵥ-ext (strnrmₗₑᵥ-appₗ snw)
           strnrm-appvar : isStrNrm (app (ext M) (var fz)) → isStrNrm M
           strnrm-appvar snw = pj1 snw ,, strnrmₗₑᵥ-appvar (pj2 snw)
           varz-red-cand : ∀ {n} i → red-cand (var {n} i) T
-          varz-red-cand i = prj2 (prj2 (red-cand-props (var i) T)) ntr-var (λ s → N₀ind (nrm-var _ s))
-          CR1 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
+          varz-red-cand i = rc3 (var i) T ntr-var (λ s → N₀ind (nrm-var _ s))
+          RC1 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
                       → isStrNrm M
-          CR1 fnc = strnrm-appvar (prj1 (red-cand-props (app (ext M) (var fz)) S)
-                                        (fnc one (varz-red-cand fz)))
+          RC1 fnc = strnrm-appvar (rc1 (app (ext M) (var fz)) S (fnc one (varz-red-cand fz)))
 
-          CR2 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
+          RC2 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
                      → {M' : Trm n} → M ⟶ M'
                        → ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M') N) S
-          CR2 fnc {M'} stp k {N} rc = prj1 (prj2 (red-cand-props (app (ext[ k ] M) N) S)) (fnc k rc) (βappₗ (⟶-extk k stp))
+          RC2 fnc {M'} stp k {N} rc = rc2 (app (ext[ k ] M) N) S (fnc k rc) (βappₗ (⟶-extk k stp))
 
           -- use the fact that a reduction `app M N ⟶ P` is either `β`, `βappₗ`, or `βappᵣ`,
           -- and it cannot be `β` when `M` is neutral
           Mβapp-inv : ∀ k N → is-invrt (βapp-stp {k +N n} {ext[ k ] M} {N})
           Mβapp-inv k N = equiv-is-invrt (βapp-eqv {k +N n} {ext[ k ] M} {N})
-          CR3-auxₗ : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+          RC3-auxₗ : (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
                       → ∀ k {N} → red-cand N T
-                      → (MM : Σ[ Trm (k +N n) ] _⟶_ (ext[ k ] M))
+                      → (MM : Σ[ Trm (k +N n) ] (ext[ k ] M ⟶_))
                         → red-cand (app (pj1 MM) N) S
-          CR3-auxₗ Mntr fnc k {N} rc MM =
+          RC3-auxₗ fnc k {N} rc MM =
             =transp (λ x → red-cand x S)
                     (=ap (λ x → app x N) (prj1 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))))
                     (fnc (prj2 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))) k rc)
 
-          CR3-aux : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+          RC3-aux : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
                     → ∀ {l} k {N} → isStrNrmₗₑᵥ l N → red-cand N T
                       → ∀ {P} → app (ext[ k ] M) N ⟶ P → red-cand P S
-          CR3-aux Mntr fnc {zero} k {N} (strnrm-nrm Nnrm) Nrc {P} stp =
+          RC3-aux Mntr fnc {zero} k {N} (strnrm-nrm Nnrm) Nrc {P} stp =
             ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
               (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
                      (λ islam → N₀ind (neutral≠lam (neutral-extk k Mntr) islam))
-                     (CR3-auxₗ Mntr fnc k Nrc)
+                     (RC3-auxₗ fnc k Nrc)
                      (λ NN → N₀ind (Nnrm (pj1 NN) (pj2 NN)))
                      (pj1 (Mβapp-inv k N) (P ,, stp)))
-          CR3-aux Mntr fnc {suc l} k {N} (strnrm-stp Nsns) Nrc {P} stp =
+          RC3-aux Mntr fnc {suc l} k {N} (strnrm-stp Nsns) Nrc {P} stp =
             ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
               (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
                      (λ islam → N₀ind (neutral≠lam (neutral-extk k Mntr) islam))
-                     (CR3-auxₗ Mntr fnc k Nrc)
-                     (λ NN → prj2 (prj2 (red-cand-props (app (ext[ k ] M) (pj1 NN)) S))
-                                (ntr-app (neutral-extk k Mntr))
+                     (RC3-auxₗ fnc k Nrc)
+                     (λ NN → rc3 (app (ext[ k ] M) (pj1 NN)) S
+                                  (ntr-app (neutral-extk k Mntr))
                      -- because of this recursive call...
-                                (CR3-aux Mntr fnc {l} k (Nsns (pj2 NN))
-                                              (prj1 (prj2 (red-cand-props N T))
-                                                 Nrc (pj2 NN))) )
+                                  (RC3-aux Mntr fnc {l} k (Nsns (pj2 NN))
+                                           (rc2 N T Nrc (pj2 NN))) )
                      -- ...it seems hard to do induction only on the right-hand side
                      (pj1 (Mβapp-inv k N) (P ,, stp)))
 
-          CR3 : is-neutral M
-                  → (∀ {M'} (stp : M ⟶ M') → red-cand M' (T ⇒ S))
+          RC3 : is-neutral M
+                  → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
                     → ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
-          CR3 Mntr fnc k {N} Nrc =
-            prj2 (prj2 (red-cand-props (app (ext[ k ] M) N) S))
-                 (ntr-app (neutral-extk k Mntr))
-                 (CR3-aux Mntr fnc k (pj2 (prj1 (red-cand-props N T) Nrc)) Nrc)
+          RC3 Mntr fnc k {N} Nrc =
+            rc3 (app (ext[ k ] M) N) S
+                (ntr-app (neutral-extk k Mntr))
+                (RC3-aux Mntr fnc k (pj2 (rc1 N T Nrc)) Nrc)
   -- end red-cand-props
+
+  red-cand-lam : ∀ {n M R S} → (∀ {N} → red-cand {n} N R → red-cand (subst-0 M N) S)
+                      → red-cand (lam M) (R ⇒ S)
+  red-cand-lam {n} {M} {R} {S} pf k {N} Nrc = {!!}
+    where
+
+  -- the fundamental lemma
+
+  red-cand-⊢ : ∀ {Γ T M f} → Γ ⊢ M ∶ T → (∀ i → red-cand {len Γ} (f i) (pr Γ i))
+                    → red-cand (subst-all M f) T
+  red-cand-⊢ {Γ} {T} {var i} {f} (⊢-var inc) pf =
+    (red-cand (f i) ● vartypr inc) (pf i)
+  red-cand-⊢ {Γ} {R ⇒ S} {lam M} {f} (⊢-abs der) pf =
+    {!!}
+    where ih : ∀ {g} → (∀ i → red-cand {len Γ} (g i) (pr (R ∣ Γ) i))
+                 → red-cand (subst-all M g) S
+          ih = {!!} --red-cand-⊢ der
+          ih0 : ∀ {N} → red-cand {len Γ} N R → red-cand (subst-0 M N) S
+          ih0 {N} rc = {!ih!}
+  red-cand-⊢ {Γ} {T} {app M N} {f} (⊢-app der₁ der₂) pf = {!!}
 
 -- end file
