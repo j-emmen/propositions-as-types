@@ -860,6 +860,20 @@ module Lambda-Calculus where
   -- β-equivalence
   _≡β_ : ∀ {n} → Trm n → Trm n → Set
   _≡β_ = rst-closure _⟶_
+  ≡βrfl : ∀ {n} → (M : Trm n) → M ≡β M
+  ≡βrfl = rstcl-rfl
+  ≡βsym : ∀ {n} → {M N : Trm n} → M ≡β N → N ≡β M
+  ≡βsym = rstcl-sym
+  ≡βcnc : ∀ {n} → {M N L : Trm n} → M ⟶ N → N ≡β L → M ≡β L
+  ≡βcnc = rstcl-cnc
+  ≡βcnc' : ∀ {n} → {M N L : Trm n} → M ≡β N → N ⟶ L → M ≡β L
+  ≡βcnc' = rstcl-cnc' _⟶_
+  ≡βin : {n : Nat}{M N : Trm n} → M ⟶ N  → M ≡β N
+  ≡βin = rstcl-in _⟶_
+  ≡βtr : {n : Nat}{M N L : Trm n} → M ≡β N → N ≡β L → M ≡β L
+  ≡βtr = rstcl-tran _⟶_
+  ⟶⋆to≡β : ∀ {n} {M N : Trm n} → M ⟶⋆ N → M ≡β N
+  ⟶⋆to≡β = rt-to-rst-closure _⟶_
 
   -- the parallel reduction relation
   infix 10 _≡>_ _≡>⋆_
@@ -1585,6 +1599,10 @@ module Lambda-Calculus where
   is-normal : ∀ {n} → Trm n → Set
   is-normal M = ∀ N → ¬ (M ⟶ N)
 
+  nrm⟶⋆ : ∀ {n M N} → is-normal {n} M → M ⟶⋆ N → N == M
+  nrm⟶⋆ Mnrm (rtcl-rfl _) = =rf
+  nrm⟶⋆ Mnrm (rtcl-cnc Mstp Mred) = N₀rec (Mnrm _ Mstp)
+
   -- a value is a canonical normal term
   data is-value {n : Nat} : Trm n → Set where
     val-lam : ∀ {M} → is-normal M → is-value (lam M)
@@ -1866,16 +1884,86 @@ module Lambda-Calculus where
     ] (⟶cases M)
 
 
-  normal-form-of : ∀ {n M lM} → isStrNrmₗₑᵥ {n} lM M
-                     → Σ[ Trm n ] (λ x → is-normal x × M ⟶⋆ x)
-  normal-form-of {n} {M} {zero} (strnrm-nrm Mnrm) =
+  -- β-equivalence is decidable for normal terms
+  ≡β-nrm₁ :  ∀ {n M N} → is-normal {n} M → is-normal {n} N
+               → M ≡β N → M == N
+  ≡β-nrm₁ Mnrm Nnrm (rstcl-rfl _) =         =rf
+  ≡β-nrm₁ Mnrm Nnrm (rstcl-cnc MM' M'N) =   N₀rec (Mnrm _ MM')
+  ≡β-nrm₁ Mnrm Nnrm (rstcl-sym NM) =        ≡β-nrm₁ Nnrm Mnrm NM ⁻¹
+  ≡β-nrm₂ :  ∀ {n} {M N : Trm n} → M == N → M ≡β N
+  ≡β-nrm₂ M=N = ((_ ≡β_) ● M=N) (≡βrfl _)
+
+
+  Church-Rosser-nrm : ∀ {n M N L} → M ⟶⋆ N → M ⟶⋆ L → is-normal {n} N → L ⟶⋆ N
+  Church-Rosser-nrm {_} {M} {N} {L} red₁ red₂ Nnrm = ((L ⟶⋆_) ● eq) (prj2 (pj2 snk))
+    where snk : Sink _⟶⋆_ N L
+          snk = Church-Rosser red₁ red₂
+          eq : pj1 snk == N
+          eq = nrm⟶⋆ Nnrm (prj1 (pj2 snk))
+
+  -- normal forms
+
+  is-normal-form-of : ∀ {n} → Trm n → Trm n → Set
+  is-normal-form-of M N = is-normal N × M ⟶⋆ N
+
+  is-normal-form-of⟶⋆ : ∀ {n M N M'} → is-normal-form-of {n} M N → M' ⟶⋆ M → is-normal-form-of M' N
+  is-normal-form-of⟶⋆ NnfM  M'red = prj1 NnfM , ⟶⋆tr M'red (prj2 NnfM)
+
+  is-normal-form-of⟶⋆inv : ∀ {n M N M'} → is-normal-form-of {n} M N → M ⟶⋆ M' → is-normal-form-of M' N
+  is-normal-form-of⟶⋆inv {_} {M} {N} {M'} NnfM Mred =
+    prj1 NnfM
+    , Church-Rosser-nrm (prj2 NnfM) Mred (prj1 NnfM)
+
+
+ -- β-equivalent terms have the same normal forms
+  ≡β-normal-form : ∀ {n M M' N} → M ≡β M'
+                     → (is-normal-form-of {n} M N → is-normal-form-of M' N)
+                        × (is-normal-form-of M' N → is-normal-form-of {n} M N)
+  ≡β-normal-form (rstcl-rfl _) =
+    id , id
+  ≡β-normal-form (rstcl-cnc {_} {P} MP PM') =
+    (λ NnfM → prj1 (≡β-normal-form PM') (is-normal-form-of⟶⋆inv NnfM (⟶⋆in MP)))
+    , λ NnfM' → is-normal-form-of⟶⋆ (prj2 (≡β-normal-form PM') NnfM') (⟶⋆in MP)
+  ≡β-normal-form (rstcl-sym M'M) =
+    prj2 (≡β-normal-form M'M) , prj1 (≡β-normal-form M'M)
+  ≡β-normal-form-lr : ∀ {n M M' N} → M ≡β M'
+                     → is-normal-form-of {n} M N → is-normal-form-of M' N
+  ≡β-normal-form-lr MM' = prj1 (≡β-normal-form MM')
+  ≡β-normal-form-rl : ∀ {n M M' N} → M ≡β M'
+                     → is-normal-form-of {n} M' N → is-normal-form-of M N
+  ≡β-normal-form-rl MM' = prj2 (≡β-normal-form MM')
+    
+
+  normal-form-uq-aux : ∀ {n M N N'} → is-normal {n} N → M ⟶⋆ N → is-normal N' → M ⟶⋆ N' → N == N'
+  normal-form-uq-aux Nnrm Nstp N'nrm N'stp = ≡β-nrm₁ Nnrm N'nrm (≡βtr (≡βsym (⟶⋆to≡β Nstp)) (⟶⋆to≡β N'stp))
+  normal-form-uq : ∀ {n M N N'} → is-normal-form-of {n} M N → is-normal-form-of M N' → N == N'
+  normal-form-uq Nnf N'nf = normal-form-uq-aux (prj1 Nnf) (prj2 Nnf) (prj1 N'nf) (prj2 N'nf)
+
+  normal-form-ofₗₑᵥ : ∀ {n M lM} → isStrNrmₗₑᵥ {n} lM M
+                     → Σ[ Trm n ] (is-normal-form-of M)
+  normal-form-ofₗₑᵥ {n} {M} {zero} (strnrm-nrm Mnrm) =
     M ,, (Mnrm , ⟶⋆rfl M)
-  normal-form-of {n} {M} {suc lM} (strnrm-stp Msns) =
+  normal-form-ofₗₑᵥ {n} {M} {suc lM} (strnrm-stp Msns) =
     [ (λ Mnrm → M ,, (Mnrm , ⟶⋆rfl M))
-    ∣ (λ MM → pj1 (normal-form-of (Msns (pj2 MM)))
-              ,, ( prj1 (pj2 (normal-form-of (Msns (pj2 MM))))
-                 , ⟶⋆cnc  (pj2 MM) (prj2 (pj2 (normal-form-of (Msns (pj2 MM))))) ))
+    ∣ (λ MM → pj1 (normal-form-ofₗₑᵥ (Msns (pj2 MM)))
+              ,, ( prj1 (pj2 (normal-form-ofₗₑᵥ (Msns (pj2 MM))))
+                 , ⟶⋆cnc  (pj2 MM) (prj2 (pj2 (normal-form-ofₗₑᵥ (Msns (pj2 MM))))) ))
     ] (⟶cases M)
-          
+
+  normal-form-of : ∀ {n M} → isStrNrm {n} M
+                     → Σ[ Trm n ] (is-normal-form-of M)
+  normal-form-of {n} {M} Msn = normal-form-ofₗₑᵥ (pj2 Msn)
+
+
+  -- β-equivalence is decidable for normalising terms
+
+  ≡β-strnnrm₁ : ∀ {n M N} → (Msn : isStrNrm {n} M) → (Nsn : isStrNrm {n} N)
+                 → M ≡β N → pj1 (normal-form-of Msn) == pj1 (normal-form-of Nsn)
+  ≡β-strnnrm₁ Msn Nsn MN = normal-form-uq (pj2 (normal-form-of Msn)) (≡β-normal-form-rl MN (pj2 (normal-form-of Nsn)))
+
+  ≡β-strnnrm₂ : ∀ {n M N} → (Msn : isStrNrm {n} M) → (Nsn : isStrNrm {n} N)
+                 → pj1 (normal-form-of Msn) == pj1 (normal-form-of Nsn) → M ≡β N
+  ≡β-strnnrm₂ Msn Nsn Mnf=Nnf = ≡βtr (⟶⋆to≡β (((_ ⟶⋆_) ● Mnf=Nnf) (prj2 (pj2 (normal-form-of Msn)))))
+                                     (≡βsym (⟶⋆to≡β (prj2 (pj2 (normal-form-of Nsn)))))
 
 -- end of file

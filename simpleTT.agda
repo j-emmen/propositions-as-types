@@ -836,5 +836,20 @@ module simpleTT (Atm : Set) where
   ⊢-is-strnrm : ∀ {Γ M T} → Γ ⊢ M ∶ T → isStrNrm M
   ⊢-is-strnrm {_} {M} {T} der = red-cand-strnrm M T (⊢-is-red-cand der)
 
+  -- typable terms have normal forms
+
+  ⊢-normal-form : ∀ {Γ M T} → Γ ⊢ M ∶ T → Σ[ Trm (len Γ) ] (is-normal-form-of M)
+  ⊢-normal-form der = normal-form-of (⊢-is-strnrm der)
+
+  -- β-equivalence is decidable for typable terms
+
+  ⊢-≡β-decid₁ : ∀ {Γ M N T} → (Mder : Γ ⊢ M ∶ T) → (Nder : Γ ⊢ N ∶ T)
+                 → M ≡β N → pj1 (⊢-normal-form Mder) == pj1 (⊢-normal-form Nder)
+  ⊢-≡β-decid₁ Mder Nder MN = ≡β-strnnrm₁ (⊢-is-strnrm Mder) (⊢-is-strnrm Nder) MN
+
+  ⊢-≡β-decid₂ : ∀ {Γ M N T} → (Mder : Γ ⊢ M ∶ T) → (Nder : Γ ⊢ N ∶ T)
+                 → pj1 (⊢-normal-form Mder) == pj1 (⊢-normal-form Nder) → M ≡β N
+  ⊢-≡β-decid₂ Mder Nder Mnf=Nnf = ≡β-strnnrm₂ (⊢-is-strnrm Mder) (⊢-is-strnrm Nder) Mnf=Nnf
+
 
 -- end file
