@@ -2,6 +2,7 @@
 
 module simpleTT (Atm : Set) where
   open import Lambda-Calculus public
+  open import Basic-Relations
 
   ----------------
   -- Simple Types
@@ -10,6 +11,7 @@ module simpleTT (Atm : Set) where
   infixr 30 _⇒_
   data Ty : Set where
     atm : Atm → Ty
+    ⊥ : Ty
     _⇒_ : Ty → Ty → Ty
 
   -- contexts are (finite) lists of types
@@ -352,7 +354,9 @@ module simpleTT (Atm : Set) where
   -- doing so makes the last two clauses light grey
   -- meaning that they do NOT hold definitionally
   -- this also happens in `⟶-subst-all` and `⟶<≡>` (LambdaCalculus.agda)
-
+  subj-red⋆ : ∀ {Γ T M N} → M ⟶⋆ N → Γ ⊢ M ∶ T → Γ ⊢ N ∶ T
+  subj-red⋆ (rtcl-rfl _) der = der
+  subj-red⋆ (rtcl-cnc stp red) der = subj-red⋆ red (subj-red stp der)
 
   ------------
   -- progress
@@ -414,6 +418,7 @@ module simpleTT (Atm : Set) where
 -}
   red-cand : ∀ {n} (M : Trm n) (T : Ty) → Set
   red-cand {n} M (atm a) = isStrNrm M
+  red-cand {n} M ⊥ = isStrNrm M
   red-cand {n} M (T ⇒ S) = ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S
   -- the second clause quantifies over all `k : Nat` and `N : Trm (k +N n)`
   -- as I am not able to prove that red-cand is invariant under weakening otherwise
@@ -422,6 +427,7 @@ module simpleTT (Atm : Set) where
   red-cand-invrt : ∀ {n m M T} {f : Fin n → Fin m} → is-invrt f
                      → red-cand {n} M T → red-cand {m} (rename M f) T
   red-cand-invrt {n} {m} {M} {atm A} {f} invf Msn = strnrm-rename⁻¹ f Msn
+  red-cand-invrt {n} {m} {M} {⊥} {f} invf Msn = strnrm-rename⁻¹ f Msn
   red-cand-invrt {n} {m} {M} {T ⇒ S} {f} invf Mrc⇒ k {N} Nrc =
     ((λ x → red-cand x S) ● Peq) Prc
     where kf : Fin (k +N n) → Fin (k +N m)
@@ -458,6 +464,7 @@ module simpleTT (Atm : Set) where
   -- weakening preserves reducibility candidates
   red-cand-ext : ∀ {n M T} → red-cand {n} M T → red-cand {suc n} (ext M) T
   red-cand-ext {n} {M} {atm A} Msn = strnrm-ext⁻¹ Msn
+  red-cand-ext {n} {M} {⊥} Msn = strnrm-ext⁻¹ Msn
   red-cand-ext {n} {M} {T ⇒ S} Mrc⇒ k {N} Nrc =
     ((λ x → red-cand x S) ● Peq) Prc
     where N' : Trm (suc k +N n)
@@ -487,9 +494,13 @@ module simpleTT (Atm : Set) where
   red-candUpCl M T = is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T
   red-candUpCl' M T = ¬ (Trm-is-lam M) → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T
 
-  red-cand-props : ∀ {n} M T → red-candStrNrm M T × red-candDwnCl M T × red-candUpCl M T
+  red-cand-props : ∀ {n} M T → red-candStrNrm {n} M T × red-candDwnCl M T × red-candUpCl M T
   red-cand-props {n} M (atm a) =
       id
+    , (λ nrm {N} → strnrm-⟶ {N = N} nrm)
+    , (λ _ → strnrm-stp-any {n} {M})
+  red-cand-props {n} M ⊥ =
+    id
     , (λ nrm {N} → strnrm-⟶ {N = N} nrm)
     , (λ _ → strnrm-stp-any {n} {M})
   red-cand-props {n} M (T ⇒ S) =
@@ -575,6 +586,8 @@ module simpleTT (Atm : Set) where
   -- To have up-ward closure it is in fact enough to assume that the term is not `lam`
   red-cand-upcl' : ∀ {n} M T → red-candUpCl' {n} M T
   red-cand-upcl' {n} M (atm A) M≠lam fnc =
+    strnrm-stp-any {n} {M} fnc
+  red-cand-upcl' {n} M ⊥ M≠lam fnc =
     strnrm-stp-any {n} {M} fnc
   red-cand-upcl' {n} M (T ⇒ S) M≠lam fnc k {P} Prc =
     rc3' (app (ext[ k ] M) P) S
@@ -821,11 +834,11 @@ module simpleTT (Atm : Set) where
                    → red-cand (subst-all (subst-all M (wlift f)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]) S
           fnc h {Q} Qrc = ((λ x → red-cand x S) ● subeq h) (red-cand-⊢ Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ] der (fnc-aux h Qrc))
 
-
-  -- typable terms are reducibility candidates
   red-cand-⊢ {Γ} {T} {app M N} f (⊢-app {_} {S} der₁ der₂) pf =
     red-cand-⊢ f der₁ pf zero (red-cand-⊢ f der₂ pf)
 
+
+  -- typable terms are reducibility candidates
   ⊢-is-red-cand : ∀ {Γ M T} → Γ ⊢ M ∶ T → red-cand M T
   ⊢-is-red-cand {Γ} {M} {T} der =
     ((λ x → red-cand x T) ● subst-all-var M)
@@ -836,13 +849,13 @@ module simpleTT (Atm : Set) where
   ⊢-is-strnrm : ∀ {Γ M T} → Γ ⊢ M ∶ T → isStrNrm M
   ⊢-is-strnrm {_} {M} {T} der = red-cand-strnrm M T (⊢-is-red-cand der)
 
-  -- typable terms have normal forms
 
+  -- typable terms have normal forms
   ⊢-normal-form : ∀ {Γ M T} → Γ ⊢ M ∶ T → Σ[ Trm (len Γ) ] (is-normal-form-of M)
   ⊢-normal-form der = normal-form-of (⊢-is-strnrm der)
 
-  -- β-equivalence is decidable for typable terms
 
+  -- β-equivalence is decidable for typable terms
   ⊢-≡β-decid₁ : ∀ {Γ M N T} → (Mder : Γ ⊢ M ∶ T) → (Nder : Γ ⊢ N ∶ T)
                  → M ≡β N → pj1 (⊢-normal-form Mder) == pj1 (⊢-normal-form Nder)
   ⊢-≡β-decid₁ Mder Nder MN = ≡β-strnnrm₁ (⊢-is-strnrm Mder) (⊢-is-strnrm Nder) MN
@@ -851,5 +864,22 @@ module simpleTT (Atm : Set) where
                  → pj1 (⊢-normal-form Mder) == pj1 (⊢-normal-form Nder) → M ≡β N
   ⊢-≡β-decid₂ Mder Nder Mnf=Nnf = ≡β-strnnrm₂ (⊢-is-strnrm Mder) (⊢-is-strnrm Nder) Mnf=Nnf
 
+
+  -- there are no values of type ⊥
+  ⊥-value : ∀ {M} → is-value M → ¬ ([] ⊢ M ∶ ⊥)
+  ⊥-value {lam M} (val-lam Mnrm) ()
+  ⊥-value' : ∀ {M} → [] ⊢ M ∶ ⊥ → ¬ (is-value M)
+  ⊥-value' {lam M} () (val-lam Mnrm)
+
+
+  -- consistency: there are no terms of type ⊥ in the empty context
+  consist : ∀ {M} → ¬ ([] ⊢ M ∶ ⊥)
+  consist {M} der = ⊥-value Nvl Nty 
+    where Nnf : Σ[ Trm zero ] (is-normal-form-of M)
+          Nnf = ⊢-normal-form der
+          Nty : [] ⊢ pj1 Nnf ∶ ⊥
+          Nty = subj-red⋆ (prj2 (pj2 Nnf)) der
+          Nvl : is-value (pj1 Nnf)
+          Nvl = progr Nty (prj1 (pj2 Nnf))
 
 -- end file
