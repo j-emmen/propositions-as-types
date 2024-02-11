@@ -61,7 +61,8 @@ module Nat-and-Fin where
 
   +N-sucswap : ∀ n m → n +N suc m == suc n +N m
   +N-sucswap zero m = =rf
-  +N-sucswap (suc n) m = =ap suc (+N-sucswap n m) 
+  +N-sucswap (suc n) m = =ap suc (+N-sucswap n m)
+  -- not sure this is what I want: `Fin+N-inr fz` should go to `fz`
   +N-sucswap⁻¹ : ∀ n m → suc n +N m == n +N suc m
   +N-sucswap⁻¹ n m = +N-sucswap n m ⁻¹
 
@@ -71,13 +72,19 @@ module Nat-and-Fin where
   +N-commut (suc n) (suc m) =
     =ap suc (+N-sucswap n m • =ap suc (+N-commut n m) • +N-sucswap⁻¹ m n)
 
-  sum-0-is-0 : ∀ {n} {m} → n +N m == zero → zero == n
-  sum-0-is-0 {zero} {m} sumisz = =rf
-  sum-0-is-0⁻¹ : ∀ {n} {m} → n +N m == zero → n == zero
+  +N-assoc : ∀ n {m k} → (n +N m) +N k == n +N m +N k
+  +N-assoc zero = =rf
+  +N-assoc (suc n) = =ap suc (+N-assoc n)
+  +N-assoc⁻¹ : ∀ n {m k} → n +N m +N k == (n +N m) +N k
+  +N-assoc⁻¹ n = +N-assoc n ⁻¹
+
+  sum-0-is-0 : ∀ {n} {m} → zero == n +N m → zero == n
+  sum-0-is-0 {zero} {m} _ = =rf
+  sum-0-is-0⁻¹ : ∀ {n} {m} → zero == n +N m → n == zero
   sum-0-is-0⁻¹ sumisz = sum-0-is-0 sumisz ⁻¹
-  sum-0-is-0' : ∀ {n} {m} → n +N m == zero → zero == m
-  sum-0-is-0' {zero} {m} sumisz = sumisz ⁻¹
-  sum-0-is-0'⁻¹ : ∀ {n} {m} → n +N m == zero → m == zero
+  sum-0-is-0' : ∀ {n} {m} → zero == n +N m → zero == m
+  sum-0-is-0' {zero} {m} = id
+  sum-0-is-0'⁻¹ : ∀ {n} {m} → zero == n +N m → m == zero
   sum-0-is-0'⁻¹ sumisz = sum-0-is-0' sumisz ⁻¹
   sum-lh-rh-zero : ∀ {n m} → n +N m == n → m == zero
   sum-lh-rh-zero {zero} =            id
@@ -107,10 +114,21 @@ module Nat-and-Fin where
   <Ns {suc n} = <Ns {n}
   s<Ns : ∀ {n} {m} → n <N m → suc n <N suc m
   s<Ns {n} {m} = id
+  <Nsz : ∀ {n} → n <N one → zero == n
+  <Nsz {zero} n<sz = =rf
 
   <N-trn : ∀ {n m l} → n <N m → m <N l → n <N l
   <N-trn {zero} {m} {suc l} dq1 dq2 = 0₁
   <N-trn {suc n} {suc m} {suc l} dq1 dq2 = <N-trn {n} {m} {l} dq1 dq2
+
+  <N-trn-s : ∀ {n m l} → n <N suc m → m <N l → n <N l
+  <N-trn-s {n} {zero} {l} n<sz z<l = ((_<N l) ● <Nsz n<sz) z<l
+  <N-trn-s {zero} {suc m} {suc l} n<ssm m<l = 0₁
+  <N-trn-s {suc n} {suc m} {suc l} n<sm m<l = <N-trn-s {n} {m} {l} n<sm m<l
+
+  z<N-all : ∀ {n m} → m <N n → zero <N n
+  z<N-all {n} {zero} z<n = z<n
+  z<N-all {n} {suc m} sm<n = <N-trn {_} {_} {n} (z<Ns {m}) sm<n
 
   <+N : ∀ {n} {m} → n <N m → ∀ k → n <N k +N m
   <+N dq zero = dq
@@ -132,11 +150,7 @@ module Nat-and-Fin where
   +N<N+N' {zero} {suc m} dq k = <s+N k m
   +N<N+N' {suc n} {suc m} dq k = +N<N+N' {n} {m} dq k
   
-  <→≤ : ∀ {n} {m} → n <N m → n ≤N m
-  <→≤ {zero} {m} dq = 0₁
-  <→≤ {suc n} {suc m} dq = <→≤ {n} dq
-
-  suc-non-decr : ∀ n → suc n ≤N n → N₀
+  suc-non-decr : ∀ n →  ¬ (suc n ≤N n)
   suc-non-decr (suc n) dq = suc-non-decr n dq
 
   z≤N : ∀ {n} → zero ≤N n
@@ -191,9 +205,53 @@ module Nat-and-Fin where
   ≤N-EM (suc n) zero = inr 0₁
   ≤N-EM (suc n) (suc m) = ≤N-EM n m
 
+  ≤Nz : ∀ {n} → n ≤N zero → zero == n
+  ≤Nz {n} = ≤anti-sym (z≤N {n})
+
   ≤N-diff : ∀ {n m} → n ≤N m → Σ[ Nat ] (λ x → x +N n == m)
   ≤N-diff {zero} {m} leq = m ,, +N-idr m
   ≤N-diff {suc n} {suc m} leq = pj1 (≤N-diff {n} {m} leq) ,, +N-sucswap _ n • =ap suc (pj2 (≤N-diff {n} leq))
+
+  <s→≤ : ∀ {n m} → n <N suc m → n ≤N m
+  <s→≤ {zero} {m} dq = 0₁
+  <s→≤ {suc n} {suc m} = <s→≤ {n} {m} 
+
+  ≤→<s : ∀ {n m} → n ≤N m → n <N suc m
+  ≤→<s {zero} {m} = id
+  ≤→<s {suc n} {suc m} = ≤→<s {n} {m}
+
+  <→≤ : ∀ {n m} → n <N m → n ≤N m
+  <→≤ {zero} {m} dq = 0₁
+  <→≤ {suc n} {suc m} = <→≤ {n} {m}
+
+  <+=→≤ : ∀ {n m} → n <N m + (n == m) → n ≤N m
+  <+=→≤ {n} {m} = [ <→≤ {n} {m} ∣ =2≤N {n} {m} ]
+
+  ≤N-¬=→< : ∀ {n m} → n ≤N m → ¬ (n == m) → n <N m
+  ≤N-¬=→< {n} {zero} n≤m n≠m = n≠m (≤Nz n≤m ⁻¹)
+  ≤N-¬=→< {zero} {suc m} n≤m n≠m = 0₁
+  ≤N-¬=→< {suc n} {suc m} n≤m n≠m = ≤N-¬=→< n≤m (λ x → n≠m (=ap suc x))
+
+  ≤→<+= : ∀ {n m} → n ≤N m → n <N m + (n == m)
+  ≤→<+= {n} {m} n≤m = [ inr ∣ inl ∘ ≤N-¬=→< n≤m ] (Nat-is-decid n m)
+
+  ≤N-ind : (C : Nat → Set) → C zero → (∀ n → (∀ {m} → m ≤N n → C m) → C (suc n))
+              → ∀ n {m} → m ≤N n →  C m
+  ≤N-ind C cz cs zero {m} m≤z = (C ● ≤Nz m≤z) cz
+  ≤N-ind C cz cs (suc n) {zero} sm≤z = cz
+  ≤N-ind C cz cs (suc n) {suc m} m≤n = cs m (λ {x} y → ≤N-ind C cz cs n (≤N-trn {x} y m≤n))
+
+  ≤N-ind' : (C : Nat → Set) → C zero → (∀ n → (∀ {m} → m ≤N n → C m) → C (suc n))
+              → ∀ n →  C n
+  ≤N-ind' C cz cs n = ≤N-ind C cz cs n (≤N-rfl {n})
+
+  <N-ind : (C : Nat → Set) → (∀ n → (∀ {m} → m <N n → C m) → C n)
+              → ∀ n {m} → m <N n →  C m
+  <N-ind C cih (suc n) {zero} z<s =
+    cih zero N₀rec
+  <N-ind C cih (suc n) {suc m} m<n =
+    cih (suc m) (λ {x} x<sm → <N-ind C cih n {x} (<N-trn-s {x} {m} {n} x<sm m<n))
+
 
 
   -- finite sets
@@ -280,6 +338,16 @@ module Nat-and-Fin where
   Fin-diag fz = fz
   Fin-diag (fs i) = i
 
+  N₀+-eqv : ∀ {A} → N₀ + A ≃ A
+  N₀+-eqv {A} = fnc ,, invrt-is-eqv (inr ,, (eq , (λ _ → =rf)))
+    where fnc : N₀ + A → A
+          fnc = [ N₀rec ∣ id ]
+          eq : ∀ z → inr (fnc z) == z
+          eq = +ind (λ z → inr (fnc z) == z) N₀ind (λ _ → =rf)
+
+  Fin-s+N-eqv : ∀ {n m} → Fin (n +N suc m) ≃ Fin (suc n +N m)
+  Fin-s+N-eqv {n} {m} = Fin-=to→ (+N-sucswap n m) ,, invrt-is-eqv (Fin-=to→-invrt (+N-sucswap n m))
+  
 
   -- max of finite stuff
   is-maxN-2 : ∀ n m → Nat → Set
@@ -410,8 +478,6 @@ module Nat-and-Fin where
     where inv : is-invrt (Fin-=to→ (+N-sucswap n m))
           inv = Fin-=to→-invrt (+N-sucswap n m)
 
-
-
   -- inclusion on the right given by order
   Fin-≤to→r : ∀ {n m} → n ≤N m → Fin n → Fin m
   Fin-≤to→r {n} {m} leq = Fin-=to→ eq ∘ Fin+N-inr {k} {n}
@@ -480,10 +546,59 @@ module Nat-and-Fin where
                                                (λ i → eql i • Fin+N-trl lt rt i ⁻¹)
                                                (λ i → eqr i • Fin+N-trr lt rt i ⁻¹)
 
+  Fin+N-fncuq⁻¹ :  ∀ {n m} {A : Set} (lt : Fin n → A) (rt : Fin m → A) {f : Fin (n +N m) → A}
+                   → (∀ i → f (Fin+N-inl i) == lt i) → (∀ i → f (Fin+N-inr i) == rt i)
+                     → ∀ i → Fin+N-fnc lt rt i == f i
+  Fin+N-fncuq⁻¹ lt rt {f} eql eqr = Fin+N-fncuqg {f = Fin+N-fnc lt rt} {f}
+                                                 (λ i → Fin+N-trl lt rt i • eql i ⁻¹)
+                                                 (λ i → Fin+N-trr lt rt i • eqr i ⁻¹)
 
-  Fin+N-fnc-invrt : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
+  Fin+N-fnc-post : ∀ {n m A B} (fl : Fin n → A) (fr : Fin m → A) → (g : A → B)
+                     → ∀ i → g (Fin+N-fnc fl fr i) == Fin+N-fnc (g ∘ fl) (g ∘ fr) i
+  Fin+N-fnc-post fl fr g = Fin+N-fncuq (g ∘ fl) (g ∘ fr) {g ∘ Fin+N-fnc fl fr}
+                                       (λ i → =ap g (Fin+N-trl fl fr i))
+                                       (λ j → =ap g (Fin+N-trr fl fr j))
+  Fin+N-fnc-post⁻¹ : ∀ {n m A B} (fl : Fin n → A) (fr : Fin m → A) → (g : A → B)
+                     → ∀ i → Fin+N-fnc (g ∘ fl) (g ∘ fr) i == g (Fin+N-fnc fl fr i)
+  Fin+N-fnc-post⁻¹ fl fr g i = Fin+N-fnc-post fl fr g i ⁻¹
+
+  Fin+N-fnc-invrt : ∀ {n n' m m'} {f : Fin n → Fin n'} {g : Fin m → Fin m'}
+                    → is-invrt f → is-invrt g → is-invrt (Fin[ Fin+N-inl ∘ f ∣ Fin+N-inr ∘ g ])
+  Fin+N-fnc-invrt {n} {n'} {m} {m'} {f} {g} invf invg =
+    h ,, (h[fg]=id , [fg]h=id)
+    where fg : Fin (n +N m) → Fin (n' +N m')
+          fg = Fin[ Fin+N-inl ∘ f ∣ Fin+N-inr ∘ g ]
+          h : Fin (n' +N m') → Fin (n +N m)
+          h = Fin[ Fin+N-inl ∘ pj1 invf ∣ Fin+N-inr ∘ pj1 invg ]
+          h[fg]=id : ∀ i → h (Fin[ Fin+N-inl ∘ f ∣ Fin+N-inr ∘ g ] i) == i
+          h[fg]=id = Fin+N-fncuqg {f = h ∘ fg} {id}
+                                  (λ i → =proof
+                     h (fg (Fin+N-inl i))            ==[ =ap h (Fin+N-trl _ _ i) ] /
+                     h (Fin+N-inl (f i))             ==[ Fin+N-trl _ _ (f i) ] /
+                     Fin+N-inl (pj1 invf (f i))      ==[ =ap Fin+N-inl (prj1 (pj2 invf) i) ]∎
+                     Fin+N-inl i ∎)
+                                  (λ i → =proof
+                     h (fg (Fin+N-inr i))         ==[ =ap h (Fin+N-trr (Fin+N-inl ∘ f) _ i) ] /
+                     h (Fin+N-inr (g i))          ==[ Fin+N-trr (Fin+N-inl ∘ pj1 invf) _ (g i) ] /
+                     Fin+N-inr (pj1 invg (g i))   ==[ =ap Fin+N-inr (prj1 (pj2 invg) i) ]∎
+                     Fin+N-inr i ∎)
+          [fg]h=id : ∀ j → Fin[ Fin+N-inl ∘ f ∣ Fin+N-inr ∘ g ] (h j) == j
+          [fg]h=id = Fin+N-fncuqg {f = fg ∘ h} {id}
+                          (λ i → =proof
+                     fg (h (Fin+N-inl i))            ==[ =ap fg (Fin+N-trl _ _ i)] /
+                     fg (Fin+N-inl (pj1 invf i))     ==[ Fin+N-trl _ _ (pj1 invf i) ] /
+                     Fin+N-inl (f (pj1 invf i))      ==[ =ap Fin+N-inl (prj2 (pj2 invf) i) ]∎
+                     Fin+N-inl i ∎)
+                          λ i → =proof
+                     fg (h (Fin+N-inr i))            ==[ =ap fg (Fin+N-trr (Fin+N-inl ∘ pj1 invf) _ i)] /
+                     fg (Fin+N-inr (pj1 invg i))     ==[ Fin+N-trr (Fin+N-inl ∘ f) _ (pj1 invg i) ] /
+                     Fin+N-inr (g (pj1 invg i))      ==[ =ap Fin+N-inr (prj2 (pj2 invg) i) ]∎
+                     Fin+N-inr i ∎
+          
+  
+  Fin+N-fnc-invrt+ : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
                     → is-invrt f → is-invrt g → is-invrt (Fin+N-fnc (inl ∘ f) (inr ∘ g))
-  Fin+N-fnc-invrt {n} {m}  {A} {B} {f} {g} invf invg =
+  Fin+N-fnc-invrt+ {n} {m}  {A} {B} {f} {g} invf invg =
     h ,, (h[fg]=id , [fg]h=id)
     where h : A + B → Fin (n +N m)
           h = [ Fin+N-inl ∘ pj1 invf ∣ Fin+N-inr ∘ pj1 invg ]
@@ -516,8 +631,18 @@ module Nat-and-Fin where
 
   Fin+N-fnc-eqv : ∀ {n m} {A B : Set}{f : Fin n → A}{g : Fin m → B}
                     → is-equiv f → is-equiv g → is-equiv (Fin+N-fnc (inl ∘ f) (inr ∘ g))
-  Fin+N-fnc-eqv eqvf eqvg = invrt-is-eqv (Fin+N-fnc-invrt (equiv-is-invrt eqvf)
+  Fin+N-fnc-eqv eqvf eqvg = invrt-is-eqv (Fin+N-fnc-invrt+ (equiv-is-invrt eqvf)
                                                           (equiv-is-invrt eqvg))
+
+{-
+  -- transport along certain proofs of equality 
+  +N-commut-transp-l : ∀ {n m} → ∀ i → Fin-=to→ (+N-commut n m) (Fin+N-inl {n} {m} i) == Fin+N-inr {m} {n} i
+  +N-commut-transp-l {suc zero} {zero} i = {!Fin+N-inl {one} {zero} i!}
+  +N-commut-transp-l {suc zero} {suc m} i = {!!}
+  +N-commut-transp-l {suc (suc n)} {zero} i = {!!}
+  +N-commut-transp-l {suc (suc n)} {suc m} i = {!!}
+-}
+
 
   -- splits a finite set before and after a given element
 
@@ -649,7 +774,7 @@ module Nat-and-Fin where
   FinSplit+N-isContr-pf : ∀ {n} (i : Fin (suc n)) (fsp : FinSplit+N i)
                             → splt+N-Fin i == fsp
   FinSplit+N-isContr-pf {zero} i fsp =
-    =Σchar (=×char (sum-0-is-0 (Fin-splt+N-eqn fsp)) (sum-0-is-0' (Fin-splt+N-eqn fsp)))
+    =Σchar (=×char (sum-0-is-0 (Fin-splt+N-eqn fsp ⁻¹)) (sum-0-is-0' (Fin-splt+N-eqn fsp ⁻¹)))
            (is-FinSplit+N-isProp i (pj1 fsp) _ _)
   FinSplit+N-isContr-pf {suc n} fz fsp =
     =Σchar (=×char z=nl sn=nr)
@@ -1153,7 +1278,7 @@ module Nat-and-Fin where
   liftFin :  ∀ {n m} → (Fin n → Fin m) → Fin (suc n) → Fin (suc m)
   liftFin f fz = fz
   liftFin f (fs i) = fs (f i)
-  -- listFin f = [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
+  -- listFin f ≃ [fx ; fs ∘ f] : 1 + Fin n → Fin (suc m)
 
   -- lift that swaps the first two elements
   swapFin : ∀ {n m} → (Fin n → Fin m) → Fin (suc (suc n)) → Fin (suc (suc m))
@@ -1177,10 +1302,25 @@ module Nat-and-Fin where
                        → (i : Fin (suc n)) → liftFin g (liftFin f i) == liftFin (g ∘ f) i
   liftFin-cmp f g fz = =rf
   liftFin-cmp f g (fs i) = =rf
-
   liftFin-cmp⁻¹ : {n m k : Nat}(f : Fin n → Fin m)(g : Fin m → Fin k)
                        → (i : Fin (suc n)) → liftFin (g ∘ f) i == liftFin g (liftFin f i)
   liftFin-cmp⁻¹ f g i = liftFin-cmp f g i ⁻¹
+
+  liftFin-cmpg : {n m k : Nat} (g : Fin m → Fin k) {f : Fin n → Fin m} {f' : Fin (suc n) → Fin (suc m)}
+                   → (∀ i → f' i == liftFin f i) → ∀ i → liftFin g (f' i) == liftFin (g ∘ f) i
+  liftFin-cmpg g {f} {f'} eq i = =proof
+    liftFin g (f' i)           ==[ =ap (liftFin g) (eq i) ] /
+    liftFin g (liftFin f i)    ==[ liftFin-cmp f g i ]∎
+    liftFin (g ∘ f) i ∎
+  liftFin-cmpg⁻¹ : {n m k : Nat} (g : Fin m → Fin k) {f : Fin n → Fin m} {f' : Fin (suc n) → Fin (suc m)}
+                   → (∀ i → f' i == liftFin f i) → ∀ i → liftFin (g ∘ f) i == liftFin g (f' i)
+  liftFin-cmpg⁻¹ g {f} {f'} eq i = liftFin-cmp⁻¹ f g i • =ap (liftFin g) (eq i ⁻¹)
+  liftFin-cmpgg : {n m k : Nat} {g : Fin m → Fin k} {f : Fin n → Fin m} {h : Fin n → Fin k}
+                   → (∀ i → g (f i) == h i) → ∀ i → liftFin g (liftFin f i) == liftFin h i
+  liftFin-cmpgg pf i = liftFin-cmp _ _ i • liftFin-ap pf i
+  liftFin-cmpgg⁻¹ : {n m k : Nat} {g : Fin m → Fin k} {f : Fin n → Fin m} {h : Fin n → Fin k}
+                   → (∀ i → g (f i) == h i) → ∀ i → liftFin h i == liftFin g (liftFin f i)
+  liftFin-cmpgg⁻¹ pf i = liftFin-cmpgg pf i ⁻¹
 
   liftFin-sq : {n m : Nat}{f : Fin n → Fin m}{f' : Fin (suc n) → Fin (suc m)}
                {g : Fin n → Fin (suc n)}{g' : Fin m → Fin (suc m)}
@@ -1207,6 +1347,11 @@ module Nat-and-Fin where
           lflg=id fz = =rf
           lflg=id (fs x) = =ap fs (prj2 (pj2 finv) x)
 
+  liftFin+N-inl : ∀ {n m} i → liftFin (Fin+N-inl {n} {m}) i == Fin+N-inl {suc n} i
+  liftFin+N-inl fz = =rf
+  liftFin+N-inl (fs i) = =rf
+  liftFin+N-inl⁻¹ : ∀ {n m} i → Fin+N-inl {suc n} i == liftFin (Fin+N-inl {n} {m}) i
+  liftFin+N-inl⁻¹ i = liftFin+N-inl i ⁻¹
 
   swapFin-ptw : ∀ {n m}{f : Fin n → Fin m}{g : Fin (suc (suc n)) → Fin (suc (suc m))}
                    → fs fz == g fz → fz == g (fs fz)
@@ -1257,6 +1402,45 @@ module Nat-and-Fin where
           lflg=id (fs (fs x)) = =ap (fs ∘ fs) (prj2 (pj2 finv) x)
 
 
+  -- iterated version
+
+  --liftFin-pre : ∀ {n m l} → (f : Fin n → Fin m) (g : Fin l → Fin n) → liftFin f ∘ 
+  liftFin[_] : ∀ k {n m} → (Fin n → Fin m) → Fin (k +N n) → Fin (k +N m)
+  liftFin[ k ] f = Fin[ Fin+N-inl ∣ Fin+N-inr ∘ f ]
+  liftFin[_]fs : ∀ k {n m} (f : Fin n → Fin m) → ∀ i → liftFin[ suc k ] f (fs i) == fs (liftFin[ k ] f i)
+  liftFin[ k ]fs f i =
+    liftFin[ suc k ] f (fs i) -- = Fin[ (Fin+N-inl ∘ fs) ∣ (Fin+N-inr {suc k} ∘ f) ] i
+                              -- = Fin[ fs ∘ Fin+N-inl ∣ Fin+N-inr {suc k} ∘ f ] i
+                              ==[ Fin+N-fnc-post⁻¹ Fin+N-inl (Fin+N-inr {k} ∘ f) fs i ]
+    fs (liftFin[ k ] f i)
+  liftFin[_]inl : ∀ k {n m} (f : Fin n → Fin m)
+                    → ∀ i → liftFin[ k ] f (Fin+N-inl {k} {n} i) == Fin+N-inl {k} {m} i
+  liftFin[ k ]inl f = Fin+N-trl Fin+N-inl (Fin+N-inr ∘ f)
+  liftFin[z] : ∀ {n m} (f : Fin n → Fin m) → ∀ i → liftFin[ zero ] f i == f i
+  liftFin[z] f i = =rf
+  liftFin[s_] : ∀ k {n m} (f : Fin n → Fin m) → ∀ i → liftFin[ suc k ] f i == liftFin (liftFin[ k ] f) i
+  liftFin[s k ] {n} {m} f =
+    Fin+N-fncuqg {suc k} {n} {f = liftFin[ suc k ] f} {liftFin (liftFin[ k ] f)}
+                 (λ i → =proof
+                   liftFin[ suc k ] f (Fin+N-inl i)        ==[ liftFin[ suc k ]inl f i ] /
+                   Fin+N-inl {suc k} {m} i                 ==[ liftFin+N-inl⁻¹ i ] /
+                   liftFin Fin+N-inl i                     ==[ liftFin-ap (λ x → liftFin[ k ]inl f x ⁻¹) i ] /
+                   liftFin (liftFin[ k ] f ∘ Fin+N-inl) i  ==[ liftFin-cmpg⁻¹ (liftFin[ k ] f) liftFin+N-inl⁻¹ i ]∎
+                   liftFin (liftFin[ k ] f) (Fin+N-inl i) ∎)
+                 (λ j → liftFin[ k ]fs f (Fin+N-inr j))
+{- inductive version of liftFin[k]
+  --liftFin[ zero ] f = f
+  --liftFin[ suc k ] f = liftFin (liftFin[ k ] f)
+  liftFin[_]eq : ∀ k {n m} → (f : Fin n → Fin m) → ∀ i → liftFin[ k ] f i == Fin[ Fin+N-inl ∣ Fin+N-inr ∘ f ] i
+  liftFin[ zero ]eq f i = =rf
+  liftFin[ suc k ]eq f fz = =rf
+  liftFin[ suc k ]eq f (fs i) = =proof
+    fs (liftFin[ k ] f i)                               ==[ =ap fs (liftFin[ k ]eq f i) ] /
+    fs (Fin[ Fin+N-inl ∣ Fin+N-inr ∘ f ] i)              ==[ Fin+N-fnc-post Fin+N-inl (Fin+N-inr ∘ f) fs i ]∎
+    Fin[ Fin+N-inl ∣ (λ x → fs (Fin+N-inr x)) ∘ f ] (fs i) ∎
+-}
+
+
   -- the pigeonhole principle, and related stuff
 
   Fin-pgnhl : ∀ {n m} {f : Fin n → Fin m} → n == m → is-injective f → is-surjective f
@@ -1283,5 +1467,111 @@ module Nat-and-Fin where
                             (faceFin-restrinj-invrt finj fz finv))
     where finj : is-injective f
           finj = invrt-is-injective finv
+
+
+
+  -- the equality `+N-sucswap` might be the wrong equality,
+  -- it is safer to use the function `sucswap-fnc`.
+  sucswap-fnc : ∀ {n m} → Fin (n +N suc m) → Fin (suc n +N m)
+  sucswap-fnc {n} {m} = Fin[ fs {n +N m} ∘ Fin+N-inl {n} {m} ∣ liftFin (Fin+N-inr {n} {m}) ]
+  sucswap-fnc⁻¹ : ∀ {n m} → Fin (suc n +N m) → Fin (n +N suc m)
+  sucswap-fnc⁻¹ {n} {m} = Fin[ (λ (_ : N₁) → Fin+N-inr {n} {suc m} fz) ∣ Fin[ Fin+N-inl ∣ Fin+N-inr ∘ fs ] ]
+  sucswap-zero : ∀ {n} i → sucswap-fnc {zero} {n} i == i
+  sucswap-zero {n} fz = =rf
+  sucswap-zero {n} (fs i) = =rf
+  sucswap-0 : ∀ {n} → Fin (suc (suc n)) → Fin (suc (suc n))
+  sucswap-0 {n} = sucswap-fnc {one} {n}
+  sucswap-0fs : ∀ {n} i → sucswap-0 {n} (fs i) == liftFin fs i
+  sucswap-0fs i = =rf
+  sucswap-0fs⁻¹ : ∀ {n} i → liftFin fs i == sucswap-0 {n} (fs i)
+  sucswap-0fs⁻¹ {n} i = =rf
+  sucswap-inl : ∀ {n m} i → sucswap-fnc {n} {m} (Fin+N-inl {n} {suc m} i) == fs (Fin+N-inl {n} {m} i)
+  sucswap-inl {n} {m} = Fin+N-trl (fs ∘ Fin+N-inl {n} {m}) (liftFin Fin+N-inr)
+  sucswap-inl⁻¹ : ∀ {n m} i → fs (Fin+N-inl {n} {m} i) == sucswap-fnc {n} {m} (Fin+N-inl {n} {suc m} i)
+  sucswap-inl⁻¹ i = sucswap-inl i ⁻¹ 
+  sucswap-inr : ∀ {n m} i → sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} i) == liftFin (Fin+N-inr {n} {m}) i
+  sucswap-inr {n} {m} = Fin+N-trr (fs ∘ Fin+N-inl {n} {m}) (liftFin Fin+N-inr)
+  sucswap-inr⁻¹ : ∀ {n m} i → liftFin (Fin+N-inr {n} {m}) i == sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} i)
+  sucswap-inr⁻¹ i = sucswap-inr i ⁻¹
+  sucswap-inrr : ∀ {n m} i → sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} (fs i)) == fs (Fin+N-inr {n} {m} i)
+  sucswap-inrr {n} {m} i = sucswap-inr (fs i)
+  sucswap-inrr⁻¹ : ∀ {n m} i → fs (Fin+N-inr {n} {m} i) == sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} (fs i))
+  sucswap-inrr⁻¹ i = sucswap-inrr i ⁻¹
+  sucswap-inrz : ∀ {n m} → sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} fz) == fz
+  sucswap-inrz {n} {m} = sucswap-inr {n} {m} fz
+  sucswap-inrz⁻¹ : ∀ {n m} → fz == sucswap-fnc {n} {m} (Fin+N-inr {n} {suc m} fz)
+  sucswap-inrz⁻¹ {n} {m} = sucswap-inrz {n} {m} ⁻¹
+
+  
+  sucswap-invrt : ∀ {n m} → is-invrt (sucswap-fnc {n} {m})
+  sucswap-invrt {n} {m} =
+    sucswap-fnc⁻¹ {n} {m}
+    ,, (Fin+N-fncuqg {n} {suc m} {f = sucswap-fnc⁻¹ ∘ sucswap-fnc {n} {m}} {id}
+                     (λ i → =proof
+                       sucswap-fnc⁻¹ (sucswap-fnc (Fin+N-inl i)) ==[ =ap sucswap-fnc⁻¹ (Fin+N-trl _ _ i) ] /
+                       sucswap-fnc⁻¹ (fs (Fin+N-inl i))          ==[ Fin+N-trl _ _ i ]∎
+                       Fin+N-inl i ∎)
+                     (λ j → =proof
+                      sucswap-fnc⁻¹ (sucswap-fnc (Fin+N-inr {n} {suc m} j))
+                                                            ==[ =ap sucswap-fnc⁻¹ (Fin+N-trr (fs ∘ Fin+N-inl {n} {m}) _ j) ] /
+                      sucswap-fnc⁻¹ (liftFin Fin+N-inr j)   ==[ Fin-ind (λ x → sucswap-fnc⁻¹ (liftFin Fin+N-inr x) == Fin+N-inr x)
+                                                                        =rf
+                                                                        (Fin+N-trr (Fin+N-inl {n} {suc m})
+                                                                                   (Fin+N-inr {n} {suc m} ∘ fs)) j ]∎
+                      Fin+N-inr {n} {suc m} j ∎)
+       , Fin+N-fncuqg {one} {n +N m} {f = sucswap-fnc ∘ sucswap-fnc⁻¹ {n} {m}} {id}
+                      (λ x → =proof
+                        sucswap-fnc {n} {m} (sucswap-fnc⁻¹ (Fin+N-inl x)) ==[ =ap (sucswap-fnc {n} {m}) (N₁ind {λ y → sucswap-fnc⁻¹ (Fin+N-inl y) == Fin+N-inr fz} =rf x) ] /
+                        sucswap-fnc {n} {m} (Fin+N-inr fz)                ==[ Fin+N-trr {n} {suc m} _ _ fz ] /
+                        fz                                 ==[ =ap Fin+N-inl (pj2 N₁-isContr x ⁻¹) ]∎
+                        Fin+N-inl {one} {n +N m} x ∎)
+                      (Fin+N-fncuqg {n} {m}
+                                    (λ i → =proof
+                        sucswap-fnc (sucswap-fnc⁻¹ {n} {m} (fs (Fin+N-inl i)))
+                                                                    ==[ =ap sucswap-fnc (Fin+N-trl Fin+N-inl (Fin+N-inr ∘ fs) i) ] /
+                        sucswap-fnc (Fin+N-inl i)                   ==[ Fin+N-trl _ (liftFin Fin+N-inr) i ]∎
+                        fs (Fin+N-inl i) ∎)
+                                    (λ j → =proof
+                        sucswap-fnc {n} {m} (sucswap-fnc⁻¹ (fs (Fin+N-inr j)))
+                                                                           ==[ =ap sucswap-fnc (Fin+N-trr {n} {m} Fin+N-inl _ j) ] /
+                        sucswap-fnc (Fin+N-inr {n} {suc m} (fs j))         ==[ Fin+N-trr {n} {suc m} _ _ (fs j) ]∎
+                        fs (Fin+N-inr {n} {m} j) ∎)))
+
+
+  liftFin-sucswap-inl : ∀ {n m} i → liftFin sucswap-fnc (Fin+N-inl {suc n} i)
+                                            == liftFin (fs {n +N m}) (Fin+N-inl {suc n} i)
+  liftFin-sucswap-inl {n} {m} fz = =rf
+  liftFin-sucswap-inl {n} {m} (fs i) = =ap fs (sucswap-inl i)
+  liftFin-sucswap-inl⁻¹ : ∀ {n m} i → liftFin (fs {n +N m}) (Fin+N-inl {suc n} i)
+                                            == liftFin sucswap-fnc (Fin+N-inl {suc n} i)
+  liftFin-sucswap-inl⁻¹ i = liftFin-sucswap-inl i ⁻¹
+  liftFin-sucswap-inr : ∀ {n m} i → liftFin sucswap-fnc (Fin+N-inr {suc n} {suc m} i)
+                                            == fs (liftFin (Fin+N-inr {n} {m}) i)
+  liftFin-sucswap-inr {n} {m} fz = =ap fs (sucswap-inrz {n} {m})
+  liftFin-sucswap-inr {n} {m} (fs i) = =ap fs (sucswap-inrr i)
+  liftFin-sucswap-inr⁻¹ : ∀ {n m} i → fs (liftFin (Fin+N-inr {n} {m}) i)
+                                         == liftFin sucswap-fnc (Fin+N-inr {suc n} {suc m} i)
+  liftFin-sucswap-inr⁻¹ {n} {m} i = liftFin-sucswap-inr {n} {m} i ⁻¹
+
+  liftFin-sucswap : ∀ {n m} i
+    → liftFin (sucswap-fnc {n} {m}) i == sucswap-0 (sucswap-fnc {suc n} {m} i)
+  liftFin-sucswap {n} {m} =
+    Fin+N-ind {suc n} {suc m} (λ i → liftFin sucswap-fnc i == sucswap-0 (sucswap-fnc {suc n} {m} i))
+              (λ i → =proof
+                liftFin sucswap-fnc (Fin+N-inl {suc n} i)                   ==[ liftFin-sucswap-inl i ] /
+                liftFin (fs {n +N m}) (Fin+N-inl {suc n} i)                 ==[ sucswap-inr⁻¹ {one} {n +N m} (Fin+N-inl i) ] /
+                sucswap-0 (fs (Fin+N-inl {suc n} i))                        ==[ =ap sucswap-0 (sucswap-inl⁻¹ i) ]∎
+                sucswap-0 (sucswap-fnc {suc n} {m} (Fin+N-inl {suc n} i)) ∎)
+              (λ i → =proof
+                liftFin (sucswap-fnc {n} {m}) (Fin+N-inr {suc n} {suc m} i)    ==[ liftFin-sucswap-inr i ] /
+                fs (liftFin (Fin+N-inr {n} {m}) i)                             ==[ aux i ] /
+                sucswap-0 (liftFin (Fin+N-inr {suc n} {m}) i)                  ==[ =ap sucswap-0 (sucswap-inr⁻¹ i) ]∎
+                sucswap-0 (sucswap-fnc {suc n} (Fin+N-inr {suc n} {suc m} i)) ∎)
+    where aux : ∀ i → fs (liftFin (Fin+N-inr {n} {m}) i) == sucswap-0 (liftFin (Fin+N-inr {suc n} {m}) i)
+          aux fz = =rf
+          aux (fs i) = =rf
+  liftFin-sucswap⁻¹ : ∀ {n m} i
+    → sucswap-0 {n +N m} (sucswap-fnc {suc n} {m} i) == liftFin (sucswap-fnc {n} {m}) i
+  liftFin-sucswap⁻¹ i = liftFin-sucswap i ⁻¹
 
 -- -- end of file

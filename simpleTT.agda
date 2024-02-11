@@ -1,6 +1,6 @@
 {-# OPTIONS --without-K #-}
 
-module simpleTT (A : Set) where
+module simpleTT (Atm : Set) where
   open import Nat-and-Fin public
   open import Lambda-Calculus public
 
@@ -10,7 +10,7 @@ module simpleTT (A : Set) where
 
   infixr 30 _⇒_
   data Ty : Set where
-    atm : A → Ty
+    atm : Atm → Ty
     _⇒_ : Ty → Ty → Ty
 
   -- contexts are (finite) lists of types
@@ -387,8 +387,8 @@ module simpleTT (A : Set) where
   neutral-is-var+app (ntr-app {M₁} {M₂} _) = inr ((M₁ , M₂) ,, =rf)
   -- and `M₁` is app+var as well, and so on
   neutral≠lam : ∀ {n M} → is-neutral M → ¬ (Σ[ Trm (suc n) ] (λ x → lam x == M))
-  neutral≠lam ntr-var islam = lam≠var _ (pj1 islam) (pj2 islam)
-  neutral≠lam (ntr-app ntr) islam = lam≠app (pj1 islam) _ _ (pj2 islam)
+  neutral≠lam ntr-var islam = lam≠var (pj2 islam)
+  neutral≠lam (ntr-app ntr) islam = lam≠app (pj2 islam)
   neutral-rename : ∀ {n m} (f : Fin n → Fin m) {M}
                         → is-neutral M → is-neutral (rename M f)
   neutral-rename f {var _} ntr-var = ntr-var
@@ -419,19 +419,80 @@ module simpleTT (A : Set) where
   -- the second clause quantifies over all `k : Nat` and `N : Trm (k +N n)`
   -- as I am not able to prove that red-cand is invariant under weakening otherwise
 
+  -- renaming along bijections preserve reducibility candidates
+  red-cand-invrt : ∀ {n m M T} {f : Fin n → Fin m} → is-invrt f
+                     → red-cand {n} M T → red-cand {m} (rename M f) T
+  red-cand-invrt {n} {m} {M} {atm A} {f} invf Msn = strnrm-rename⁻¹ f Msn
+  red-cand-invrt {n} {m} {M} {T ⇒ S} {f} invf Mrc⇒ k {N} Nrc =
+    ((λ x → red-cand x S) ● Peq) Prc
+    where kf : Fin (k +N n) → Fin (k +N m)
+          kf = Fin[ Fin+N-inl ∣ Fin+N-inr ∘ f ]
+          invkf : is-invrt kf
+          invkf = Fin+N-fnc-invrt id-is-invrt invf
+          N' : Trm (k +N n)
+          N' = rename N (pj1 invkf)
+          N'rc : red-cand N' T
+          N'rc = red-cand-invrt (inv-is-invrt invkf) Nrc
+          P : Trm (k +N m)
+          P = rename (app (ext[ k ] M) N') kf
+          Prc : red-cand P S
+          Prc = red-cand-invrt invkf (Mrc⇒ k N'rc)
+          Peq : P == app (ext[ k ] (rename M f)) N
+          Peq = =ap₂ app
+            (=proof
+            rename (ext[ k ] M) kf                 ==[ =ap (λ x → rename x kf) (ext[ k ]-is-rename M) ] /
+            rename (rename M (Fin+N-inr {k})) kf   ==[ rename-sqg M (Fin+N-trr (Fin+N-inl {k}) _) ] /
+            rename (rename M f) (Fin+N-inr {k})    ==[ ext[ k ]-is-rename⁻¹ (rename M f) ]∎
+            ext[ k ] (rename M f) ∎)
+            (=proof
+            rename N' kf               ==[ rename-act N (pj1 invkf) kf ] /
+            rename N (kf ∘ pj1 invkf)  ==[ rename-id N (prj2 (pj2 invkf)) ]∎
+            N ∎)
+
+  red-cand-sucswap : ∀ {n m M T} → red-cand {n +N suc m} M T
+                       → red-cand {suc n +N m} (Trm-sucswap M) T
+  red-cand-sucswap {n} {m} Mrc = red-cand-invrt (sucswap-invrt {n} {m}) Mrc
+  red-cand-sucswap⁻¹ : ∀ {n m M T} → red-cand {suc n +N m} M T
+                       → red-cand {n +N suc m} (Trm-sucswap⁻¹ M) T
+  red-cand-sucswap⁻¹ {n} {m} Mrc = red-cand-invrt (inv-is-invrt (sucswap-invrt {n} {m})) Mrc
+
+  -- weakening preserves reducibility candidates
+  red-cand-ext : ∀ {n M T} → red-cand {n} M T → red-cand {suc n} (ext M) T
+  red-cand-ext {n} {M} {atm A} Msn = strnrm-ext⁻¹ Msn
+  red-cand-ext {n} {M} {T ⇒ S} Mrc⇒ k {N} Nrc =
+    ((λ x → red-cand x S) ● Peq) Prc
+    where N' : Trm (suc k +N n)
+          N' = Trm-sucswap N
+          Neq : rename N' sucswap-fnc⁻¹ == N
+          Neq = prj1 (pj2 Trm-sucswap-invrt) N
+          N'rc : red-cand N' T
+          N'rc = red-cand-invrt (sucswap-invrt {k} {n}) Nrc
+          P : Trm (k +N suc n)
+          P = Trm-sucswap⁻¹ (app (ext[ suc k ] M) N')
+          Peq : P == app (ext[ k ] (ext M)) N
+          Peq = =ap₂ app (ext[ k ]ext-inv⁻¹ M) Neq
+          Prc : red-cand P S
+          Prc = red-cand-invrt (inv-is-invrt (sucswap-invrt {k} {n})) (Mrc⇒ (suc k) N'rc)
+
+  red-cand-ext[_] : ∀ k {n M T} → red-cand {n} M T → red-cand {k +N n} (ext[ k ] M) T
+  red-cand-ext[ zero ] {n} {M} {T} Mrc = Mrc
+  red-cand-ext[ suc k ] {n} {M} {T} Mrc = red-cand-ext (red-cand-ext[ k ] Mrc)
+
+
   -- the three fundamental properties of reducibility candidates
   red-candStrNrm : ∀ {n} → Trm n → Ty → Set
   red-candStrNrm M T = red-cand M T → isStrNrm M
   red-candDwnCl : ∀ {n} → Trm n → Ty → Set
   red-candDwnCl M T = red-cand M T → ∀ {N} → M ⟶ N → red-cand N T
-  red-candUpCl : ∀ {n} → Trm n → Ty → Set
+  red-candUpCl red-candUpCl' : ∀ {n} → Trm n → Ty → Set
   red-candUpCl M T = is-neutral M → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T
+  red-candUpCl' M T = ¬ (Trm-is-lam M) → (∀ {N} → M ⟶ N → red-cand N T) → red-cand M T
 
   red-cand-props : ∀ {n} M T → red-candStrNrm M T × red-candDwnCl M T × red-candUpCl M T
   red-cand-props {n} M (atm a) =
       id
     , (λ nrm {N} → strnrm-⟶ {N = N} nrm)
-    , λ _ → strnrm-stp-any {n} {M}
+    , (λ _ → strnrm-stp-any {n} {M})
   red-cand-props {n} M (T ⇒ S) =
     RC1
     , RC2
@@ -442,8 +503,6 @@ module simpleTT (A : Set) where
           rc2 P R = prj1 (prj2 (red-cand-props P R))
           rc3 : ∀ {k} P R → red-candUpCl {k} P R
           rc3 P R = prj2 (prj2 (red-cand-props P R))
-          nrmaux : ∀ {N} → red-candStrNrm (app M N) S --red-cand (app M N) S → isStrNrm (app M N)
-          nrmaux {N} = rc1 (app M N) S
           strnrmₗₑᵥ-appvar : ∀ {k} → isStrNrmₗₑᵥ k (app (ext M) (var fz)) → isStrNrmₗₑᵥ k M
           strnrmₗₑᵥ-appvar snw = strnrmₗₑᵥ-ext (strnrmₗₑᵥ-appₗ snw)
           strnrm-appvar : isStrNrm (app (ext M) (var fz)) → isStrNrm M
@@ -457,7 +516,7 @@ module simpleTT (A : Set) where
           RC2 : (fnc : ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M) N) S)
                      → {M' : Trm n} → M ⟶ M'
                        → ∀ k {N} → red-cand N T → red-cand (app (ext[ k ] M') N) S
-          RC2 fnc {M'} stp k {N} rc = rc2 (app (ext[ k ] M) N) S (fnc k rc) (βappₗ (⟶-extk k stp))
+          RC2 fnc {M'} stp k {N} rc = rc2 (app (ext[ k ] M) N) S (fnc k rc) (βappₗ (⟶-ext[ k ] stp))
 
           -- use the fact that a reduction `app M N ⟶ P` is either `β`, `βappₗ`, or `βappᵣ`,
           -- and it cannot be `β` when `M` is neutral
@@ -469,8 +528,8 @@ module simpleTT (A : Set) where
                         → red-cand (app (pj1 MM) N) S
           RC3-auxₗ fnc k {N} rc MM =
             =transp (λ x → red-cand x S)
-                    (=ap (λ x → app x N) (prj1 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))))
-                    (fnc (prj2 (pj2 (⟶-extk⁻¹g k  (pj2 MM)))) k rc)
+                    (=ap (λ x → app x N) (prj1 (pj2 (⟶-ext[ k ]⁻¹g  (pj2 MM)))))
+                    (fnc (prj2 (pj2 (⟶-ext[ k ]⁻¹g  (pj2 MM)))) k rc)
 
           RC3-aux : is-neutral M → (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
                     → ∀ {l} k {N} → isStrNrmₗₑᵥ l N → red-cand N T
@@ -504,24 +563,279 @@ module simpleTT (A : Set) where
                 (RC3-aux Mntr fnc k (pj2 (rc1 N T Nrc)) Nrc)
   -- end red-cand-props
 
-  red-cand-lam : ∀ {n M R S} → (∀ {N} → red-cand {n} N R → red-cand (subst-0 M N) S)
-                      → red-cand (lam M) (R ⇒ S)
-  red-cand-lam {n} {M} {R} {S} pf k {N} Nrc = {!!}
-    where
+  red-cand-strnrm : ∀ {n} M T → red-candStrNrm {n} M T
+  red-cand-strnrm M T = prj1 (red-cand-props M T)
+  red-cand-dwncl : ∀ {n} M T → red-candDwnCl {n} M T
+  red-cand-dwncl M T = prj1 (prj2 (red-cand-props M T))
+  red-cand-upcl : ∀ {n} M T → red-candUpCl {n} M T
+  red-cand-upcl M T = prj2 (prj2 (red-cand-props M T))
+
+  red-cand-var : ∀ {n} i T → red-cand {n} (var i) T
+  red-cand-var i T = red-cand-upcl (var i) T ntr-var (λ varred → N₀rec (¬var⟶ varred))
+
+  -- To have up-ward closure it is in fact enough to assume that the term is not `lam`
+  red-cand-upcl' : ∀ {n} M T → red-candUpCl' {n} M T
+  red-cand-upcl' {n} M (atm A) M≠lam fnc =
+    strnrm-stp-any {n} {M} fnc
+  red-cand-upcl' {n} M (T ⇒ S) M≠lam fnc k {P} Prc =
+    rc3' (app (ext[ k ] M) P) S
+         (λ z → lam≠app (pj2 z))
+         (RC3-aux fnc k (pj2 (red-cand-strnrm P T Prc)) Prc )
+    where rc3' : ∀ {k} P R → red-candUpCl' {k} P R
+          rc3' P R = red-cand-upcl' P R          
+          -- use the fact that a reduction `app M N ⟶ P` is either `β`, `βappₗ`, or `βappᵣ`,
+          -- and it cannot be `β` when `M` is not `lam`
+          Mβapp-inv : ∀ k N → is-invrt (βapp-stp {k +N n} {ext[ k ] M} {N})
+          Mβapp-inv k N = equiv-is-invrt (βapp-eqv {k +N n} {ext[ k ] M} {N})
+          RC3-auxₗ : (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+                      → ∀ k {N} → red-cand N T
+                      → (MM : Σ[ Trm (k +N n) ] (ext[ k ] M ⟶_))
+                        → red-cand (app (pj1 MM) N) S
+          RC3-auxₗ fnc k {N} rc MM =
+            =transp (λ x → red-cand x S)
+                    (=ap (λ x → app x N) (prj1 (pj2 (⟶-ext[ k ]⁻¹g  (pj2 MM)))))
+                    (fnc (prj2 (pj2 (⟶-ext[ k ]⁻¹g  (pj2 MM)))) k rc)
+
+          RC3-aux : (∀ {M'} → M ⟶ M' → red-cand M' (T ⇒ S))
+                    → ∀ {l} k {N} → isStrNrmₗₑᵥ l N → red-cand N T
+                      → ∀ {P} → app (ext[ k ] M) N ⟶ P → red-cand P S
+          RC3-aux fnc {zero} k {N} (strnrm-nrm Nnrm) Nrc {P} stp =
+            ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
+              (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
+                     (λ islam → N₀ind (M≠lam (ext[ k ]-lam-is-lam⁻¹ islam)))
+                     (RC3-auxₗ fnc k Nrc)
+                     (λ NN → N₀ind (Nnrm (pj1 NN) (pj2 NN)))
+                     (pj1 (Mβapp-inv k N) (P ,, stp)))
+          RC3-aux fnc {suc l} k {N} (strnrm-stp Nsns) Nrc {P} stp =
+            ((λ x → red-cand x S) ● (=pj1 (prj2 (pj2 (Mβapp-inv k N)) (P ,, stp))))
+              (+ind3 (λ x → red-cand (pj1 (βapp-stp x)) S)
+                     (λ islam → N₀ind (M≠lam (ext[ k ]-lam-is-lam⁻¹ islam)))
+                     (RC3-auxₗ fnc k Nrc)
+                     (λ NN → rc3' (app (ext[ k ] M) (pj1 NN)) S
+                                   (λ z → lam≠app (pj2 z))
+                     -- because of this recursive call...
+                                   (RC3-aux fnc {l} k (Nsns (pj2 NN))
+                                            (red-cand-dwncl N T Nrc (pj2 NN))))
+                     -- ...it seems hard to do induction only on the right-hand side
+                     (pj1 (Mβapp-inv k N) (P ,, stp)))
+
+
+{- unlikely that it holds
+  red-cand-rename : ∀ {n m M T} f → red-cand {n} M T → red-cand {m} (rename M f) T
+  red-cand-rename {M = M} {atm A} f Msn =
+    strnrm-rename⁻¹ f Msn
+  red-cand-rename {M = M} {T ⇒ S} f Mrc⇒ k {N} Nrc = {!!}
+    where rcrnm : ∀ {P} (Prc : red-cand P T) → red-cand (rename (app (ext[ k ] M) P) (liftFin[ k ] f)) S
+          rcrnm {P} Prc = red-cand-rename {T = S} (liftFin[ k ] f) (Mrc⇒ k Prc)
+          aim : ∀ {P} (Prc : red-cand P T) → red-cand (app (rename (ext[ k ] M) (liftFin[ k ] f)) P) S
+          aim = {!!}
+-}
+
+
+  red-cand-abs-lam : ∀ {n M S T}
+              → (∀ h {Q} → red-cand {h +N n} Q S
+                     → red-cand (subst-all M (Fin[ (λ (_ : N₁) → Q) ∣ ext[ h ] ∘ var ])) T)
+                → ∀ k {N} → red-cand {k +N n} N S → (islam : Trm-is-lam (ext[ k ] (lam M)))
+                  → red-cand (subst-0 (pj1 islam) N) T
+  red-cand-abs-lam {n} {M} {S} {T} fnc k {N} Nrc islam =
+    ((λ x → red-cand x T) ● eqaux islam) (fnc k Nrc)
+    where extlam : Trm-is-lam (ext[ k ] (lam M))
+          extlam = ext[ k ]-lam-is-lam (M ,, =rf)
+          Meq : (islam : Trm-is-lam (ext[ k ] (lam M))) → Trm-sucswap (ext[ k ] M) == pj1 islam
+          Meq islam = =proof
+            Trm-sucswap (ext[ k ] M)    ==[ ext[ k ]-lam-swap M ⁻¹ ] /
+            pj1 extlam              ==[ lam-inj (pj2 extlam • pj2 islam ⁻¹) ]∎
+            pj1 islam ∎
+          fnc-eq : ∀ i → Fin[ (λ _ → N) ∣ ext[ k ] ∘ var ] i == (trmsect N ∘ sucswap-fnc {k} {n} ∘ Fin+N-inr {k}) i
+          fnc-eq fz = =ap (trmsect N) (sucswap-inrz⁻¹ {k})
+          fnc-eq (fs i) = =proof
+            Fin[ (λ _ → N) ∣ ext[ k ] ∘ var ] (fs i)      ==[ ext[ k ]var i ] /
+            var (Fin+N-inr {k} i)                         ==[ =ap (trmsect N) (sucswap-inrr⁻¹ i) ]∎
+            (trmsect N ∘ sucswap-fnc ∘ Fin+N-inr {k}) (fs i) ∎
+          eqaux : (islam : Trm-is-lam (ext[ k ] (lam M)))
+                    → subst-all M Fin[ (λ _ → N) ∣ ext[ k ] ∘ var ] == subst-0 (pj1 islam) N
+          eqaux islam = =proof
+            subst-all M Fin[ (λ _ → N) ∣ ext[ k ] ∘ var ]                 ==[ subst-all-ptw M fnc-eq ] /
+            subst-all M (trmsect N ∘ sucswap-fnc {k} {n} ∘ Fin+N-inr {k})  ==[ subst-all-rename M _ _ ⁻¹ ] /
+            subst-0 (rename M (sucswap-fnc {k} {n} ∘ Fin+N-inr {k})) N     ==[ =ap (λ x → subst-0 x N) (=proof
+              rename M (sucswap-fnc {k} {n} ∘ Fin+N-inr {k})               ==[ rename-act⁻¹ M _ _ ] /
+              Trm-sucswap (rename M (Fin+N-inr {k}))                       ==[ =ap Trm-sucswap (ext[ k ]-is-rename⁻¹ M) ] /
+              Trm-sucswap (ext[ k ] M)                                     ==[ Meq islam ]∎
+              pj1 islam ∎) ]∎
+            subst-0 (pj1 islam) N ∎
+
+
+  -- towards the fundamental lemma
+
+  red-cand-abs-aux-deq-zero : ∀ {n} M {S T} → (∀ k {N} → red-cand {k +N n} N S
+                                    → red-cand (subst-all M (Fin[ (λ (_ : N₁) → N) ∣ ext[ k ] ∘ var ])) T)
+                              → ∀ {lM lN} → lM +N lN ≤N zero → isStrNrmₗₑᵥ lM M → ∀ k {N} → isStrNrmₗₑᵥ lN N
+                                → red-cand {k +N n} N S → red-cand (app (ext[ k ] (lam M)) N) T
+  red-cand-abs-aux-deq-zero {n} M {S} {T} fnc {lM} {lN} deq Msn k {N} Nsn Nrc =
+    red-cand-upcl' _ T
+                   (λ z → lam≠app (pj2 z))
+                   ( λ {Q} stp →
+                       ((λ x → red-cand x T) ● =pj1 (prj2 (pj2 βapp-invMN) (Q ,, stp)))
+                                              (upward (pj1 βapp-invMN (Q ,, stp))) )
+    where lMz : zero == lM
+          lNz : zero == lN
+          lMz = sum-0-is-0 (≤Nz deq)
+          lNz = sum-0-is-0' {lM} (≤Nz deq)
+          Mnrm : is-normal M
+          Nnrm : is-normal N
+          Mnrm = (strnrm-zero ∘ (λ x → isStrNrmₗₑᵥ x M) ● lMz ⁻¹) Msn
+          Nnrm = (strnrm-zero ∘ (λ x → isStrNrmₗₑᵥ x N) ● lNz ⁻¹) Nsn
+          βapp-invMN : is-invrt (βapp-stp {k +N n} {ext[ k ] (lam M)} {N})
+          βapp-invMN = equiv-is-invrt (βapp-eqv {k +N n} {ext[ k ] (lam M)} {N})
+          upward : (z : Trm-is-lam (ext[ k ] (lam {n} M)) + Σ[ Trm _ ] (ext[ k ] (lam M) ⟶_) + Σ[ Trm _ ] (N ⟶_))
+                   → red-cand (pj1 (βapp-stp z)) T
+          upward = +ind3 (λ z → red-cand (pj1 (βapp-stp z)) T)
+                         (red-cand-abs-lam fnc k Nrc)
+                         (λ lMstp → N₀rec (Mnrm _ (βlam-inv-stp (prj2 (pj2 (⟶-ext[ k ]⁻¹g (pj2 lMstp)))))))
+                         (λ Nstp → N₀rec (Nnrm _ (pj2 Nstp)))
+
+  red-cand-abs-aux-deq-indstp : ∀ ll ( ih : ∀ {l} → l ≤N ll → ∀ {n} (M : Trm (suc n)) {S} {T}
+                                            → (∀ k {N} → red-cand {k +N n} N S
+                                                 → red-cand (subst-all M Fin[ (λ _ → N) ∣ (λ x → ext[ k ] (var x)) ]) T)
+                                            → ∀ {lM} {lN} → lM +N lN ≤N l → isStrNrmₗₑᵥ lM M
+                                            → ∀ k {N} → isStrNrmₗₑᵥ lN N → red-cand N S
+                                              → red-cand (app (ext[ k ] (lam M)) N) T )
+                                {n} M {S T} → (∀ k {N} → red-cand {k +N n} N S
+                                    → red-cand (subst-all M (Fin[ (λ (_ : N₁) → N) ∣ ext[ k ] ∘ var ])) T)
+                           → ∀ {lM lN} → lM +N lN ≤N suc ll → isStrNrmₗₑᵥ lM M
+                           → ∀ k {N} → isStrNrmₗₑᵥ lN N → red-cand {k +N n} N S
+                             → red-cand (app (ext[ k ] (lam M)) N) T
+  red-cand-abs-aux-deq-indstp ll ih {n} M {S} {T} fnc {lM} {lN} deq Msn k {N} Nsn Nrc =
+    red-cand-upcl' _ T (λ z → lam≠app (pj2 z))
+                   (λ {P} s → ((λ y → red-cand y T) ● =pj1 (prj2 (pj2 βapp-invMN) (P ,, s)))
+                                      (upward (pj1 βapp-invMN (P ,, s))))
+    where βapp-invMN : is-invrt (βapp-stp {k +N n} {ext[ k ] (lam M)} {N})
+          βapp-invMN = equiv-is-invrt (βapp-eqv {k +N n} {ext[ k ] (lam M)} {N})
+          upward-r : (Nstp : Σ[ Trm _ ] (N ⟶_)) → red-cand (app (ext[ k ] (lam M)) (pj1 Nstp)) T
+          upward-r Nstp = ih (≤N-rfl {ll}) M fnc
+                             deqr
+                             Msn k
+                             (pj2 (strnrm-⟶ (lN ,, Nsn) (pj2 Nstp)))
+                             (red-cand-dwncl N S Nrc (pj2 Nstp))
+            where deqr-aux : lM +N lN == suc (lM +N pj1 (strnrm-⟶ₗₑᵥ Nsn (pj2 Nstp)))
+                  deqr-aux = =ap (lM +N_) (prj2 (pj2 (strnrm-⟶ₗₑᵥ Nsn (pj2 Nstp)))) • +N-sucswap lM _
+                  deqr : lM +N pj1 (strnrm-⟶ₗₑᵥ Nsn (pj2 Nstp)) ≤N ll
+                  deqr = ((_≤N suc ll) ● deqr-aux) deq
+
+          upward-l : (lMstp : Σ[ Trm _ ] (ext[ k ] (lam M) ⟶_)) → red-cand (app (pj1 lMstp) N) T
+          upward-l lMstp = ((λ y → red-cand y T) ● =ap (λ x → app x N) lMeq)
+                               (ih (≤N-rfl {ll}) M' fnc' deq' (prj1 (pj2 M'sn)) k Nsn Nrc)
+            where lamM : Σ[ Trm n ] (λ x → (ext[ k ] x == pj1 lMstp) × lam M ⟶ x)
+                  lamM = ⟶-ext[ k ]⁻¹g (pj2 lMstp)
+                  M' : Trm (suc n)
+                  M' = pj1 (βlam-inv (prj2 (pj2 lamM)))
+                  lamM' : lam M' == pj1 lamM
+                  lamM' = prj2 (pj1 (pj2 (βlam-inv (prj2 (pj2 lamM)))))
+                  lMeq : ext[ k ] (lam M') == pj1 lMstp
+                  lMeq = =ap ext[ k ] lamM' • prj1 (pj2 lamM)
+                  Mstp : M ⟶ M'
+                  Mstp = prj1 (pj1 (pj2 (βlam-inv (prj2 (pj2 lamM)))))
+                  M'sn : Σ[ Nat ] (λ x → isStrNrmₗₑᵥ x M' × (lM == suc x))
+                  M'sn = strnrm-⟶ₗₑᵥ Msn Mstp
+                  fnc' : ∀ h {Q} → red-cand {h +N n} Q S
+                           → red-cand (subst-all M' Fin[ (λ _ → Q) ∣ (λ x → ext[ h ] (var x)) ]) T
+                  fnc' h {Q} Qrc = red-cand-dwncl (subst-all M _) T (fnc h Qrc)
+                                                  (⟶-subst-all Fin[ (λ _ → Q) ∣ (λ x → ext[ h ] (var x)) ] Mstp)
+                  deq' : pj1 M'sn +N lN ≤N ll
+                  deq' = ((_≤N suc ll) ● =ap (_+N lN) (prj2 (pj2 M'sn))) deq
+
+          upward : (z : Trm-is-lam (ext[ k ] (lam {n} M)) + Σ[ Trm _ ] (ext[ k ] (lam M) ⟶_) + Σ[ Trm _ ] (N ⟶_))
+                        → red-cand (pj1 (βapp-stp z)) T
+          upward = +ind3 (λ z → red-cand (pj1 (βapp-stp z)) T)
+                         (red-cand-abs-lam fnc k Nrc)
+                         upward-l
+                         upward-r
+
+
+  red-cand-abs-aux-deq : ∀ ll {n} M {S T} → (∀ k {N} → red-cand {k +N n} N S
+                                    → red-cand (subst-all M (Fin[ (λ (_ : N₁) → N) ∣ ext[ k ] ∘ var ])) T)
+                           → ∀ {lM lN} → lM +N lN ≤N ll → isStrNrmₗₑᵥ lM M → ∀ k {N} → isStrNrmₗₑᵥ lN N
+                             → red-cand {k +N n} N S → red-cand (app (ext[ k ] (lam M)) N) T
+  red-cand-abs-aux-deq =
+    ≤N-ind' (λ x → ∀ {n} M {S T} → (∀ k {N} → red-cand {k +N n} N S
+                                        → red-cand (subst-all M (Fin[ (λ (_ : N₁) → N) ∣ ext[ k ] ∘ var ])) T)
+                         → ∀ {lM lN} → lM +N lN ≤N x → isStrNrmₗₑᵥ lM M → ∀ k {N} → isStrNrmₗₑᵥ lN N
+                           → red-cand {k +N n} N S → red-cand (app (ext[ k ] (lam M)) N) T)
+            red-cand-abs-aux-deq-zero
+            red-cand-abs-aux-deq-indstp
 
   -- the fundamental lemma
 
-  red-cand-⊢ : ∀ {Γ T M f} → Γ ⊢ M ∶ T → (∀ i → red-cand {len Γ} (f i) (pr Γ i))
-                    → red-cand (subst-all M f) T
-  red-cand-⊢ {Γ} {T} {var i} {f} (⊢-var inc) pf =
+  red-cand-⊢ : ∀ {Γ T M n} (f : Fin (len Γ) → Trm n)
+                 → Γ ⊢ M ∶ T → (∀ i → red-cand {n} (f i) (pr Γ i))
+                    → red-cand {n} (subst-all M f) T
+  red-cand-⊢ {Γ} {T} {var i} f (⊢-var inc) pf =
     (red-cand (f i) ● vartypr inc) (pf i)
-  red-cand-⊢ {Γ} {R ⇒ S} {lam M} {f} (⊢-abs der) pf =
-    {!!}
-    where ih : ∀ {g} → (∀ i → red-cand {len Γ} (g i) (pr (R ∣ Γ) i))
-                 → red-cand (subst-all M g) S
-          ih = {!!} --red-cand-⊢ der
-          ih0 : ∀ {N} → red-cand {len Γ} N R → red-cand (subst-0 M N) S
-          ih0 {N} rc = {!ih!}
-  red-cand-⊢ {Γ} {T} {app M N} {f} (⊢-app der₁ der₂) pf = {!!}
+    -- doing induction on `inc` above makes the clause below propositional
+
+  red-cand-⊢ {Γ} {R ⇒ S} {lam M} {n} f (⊢-abs der) pf k {N} Nrc =
+    red-cand-abs-aux-deq (pj1 Mfsn +N pj1 Nsn)
+                         (subst-all M (wlift f))
+                         fnc
+                         (≤N-rfl {pj1 Mfsn +N pj1 Nsn})
+                         (pj2 Mfsn)
+                         k
+                         (pj2 Nsn)
+                         Nrc
+
+    where Mfrc-aux : ∀ i → red-cand (wlift f i) (pr (R ∣ Γ) i)
+          Mfrc-aux fz = red-cand-var fz R
+          Mfrc-aux (fs i) = red-cand-ext (pf i)
+          Mfrc : red-cand (subst-all M (wlift f)) S
+          Mfrc = red-cand-⊢ (wlift f) der Mfrc-aux
+          Mfsn : isStrNrm (subst-all M (wlift f))
+          Mfsn = red-cand-strnrm _ S Mfrc
+          Nsn : isStrNrm N
+          Nsn = red-cand-strnrm N R Nrc
+          subeq-aux-fs : ∀ h {Q} i → ext[ h ] (f i)
+                           == subst-all (ext (f i)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]
+          subeq-aux-fs h {Q} i = =proof
+            ext[ h ] (f i)                      ==[ subst-all-ext-var-is-ext[ h ] (f i) ⁻¹ ] /
+            subst-all (f i) (ext[ h ] ∘ var)    ==[ subst-all-extg⁻¹ (f i) _ ]∎
+            subst-all (ext (f i)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ] ∎
+          subeq-aux : ∀ h {Q} i → Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ] i
+                                 == subst-all (wlift f i) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]
+          subeq-aux h fz = =rf
+          subeq-aux h (fs i) = subeq-aux-fs h i
+          subeq : ∀ h {Q} → subst-all M Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ]
+                            == subst-all (subst-all M (wlift f)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]
+          subeq h {Q} = =proof
+            subst-all M Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ]
+                      ==[ subst-all-ptw M (subeq-aux h) ] /
+            subst-all M (λ i → subst-all (wlift f i) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ])
+                      ==[ subst-all-dist M (wlift f) _ ⁻¹ ]∎
+            subst-all (subst-all M (wlift f)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ] ∎
+          fNrc : ∀ h {Q} i → red-cand {h +N n} Q R
+                   → red-cand (subst-all (wlift f i) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]) (pr (R ∣ Γ) i)
+          fNrc _ fz Qrc = Qrc
+          fNrc h (fs i) _ = ((λ x → red-cand x (pr Γ i)) ● subeq-aux-fs h i) (red-cand-ext[ h ] (pf i))
+          fnc-aux : ∀ h {Q} → red-cand {h +N n} Q R
+                      → ∀ i → red-cand (Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ] i) (pr (R ∣ Γ) i)
+          fnc-aux _ Qrc fz = Qrc
+          fnc-aux h _ (fs i) = red-cand-ext[ h ] (pf i)
+          fnc : ∀ h {Q} → red-cand {h +N n} Q R
+                   → red-cand (subst-all (subst-all M (wlift f)) Fin[ (λ _ → Q) ∣ ext[ h ] ∘ var ]) S
+          fnc h {Q} Qrc = ((λ x → red-cand x S) ● subeq h) (red-cand-⊢ Fin[ (λ _ → Q) ∣ ext[ h ] ∘ f ] der (fnc-aux h Qrc))
+
+
+  -- typable terms are reducibility candidates
+  red-cand-⊢ {Γ} {T} {app M N} f (⊢-app {_} {S} der₁ der₂) pf =
+    red-cand-⊢ f der₁ pf zero (red-cand-⊢ f der₂ pf)
+
+  ⊢-is-red-cand : ∀ {Γ M T} → Γ ⊢ M ∶ T → red-cand M T
+  ⊢-is-red-cand {Γ} {M} {T} der =
+    ((λ x → red-cand x T) ● subst-all-var M)
+            (red-cand-⊢ var der (λ i → red-cand-var i (pr Γ i)))
+
+
+  -- typable terms are stron normalising
+  ⊢-is-strnrm : ∀ {Γ M T} → Γ ⊢ M ∶ T → isStrNrm M
+  ⊢-is-strnrm {_} {M} {T} der = red-cand-strnrm M T (⊢-is-red-cand der)
+
 
 -- end file

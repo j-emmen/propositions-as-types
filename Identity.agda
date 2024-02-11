@@ -1048,6 +1048,8 @@ module Identity where
   is-idfull f = ∀ {a a'} → is-surjective (=ap f {a} {a'})
 
   -- some invertible functions
+  inv-is-invrt : ∀ {A B} {f : A → B} (invf : is-invrt f) → is-invrt (pj1 invf)
+  inv-is-invrt {f = f} invf = f ,, (prj2 (pj2 invf) , prj1 (pj2 invf))
   id-is-invrt : ∀ {A} → is-invrt (id {A})
   id-is-invrt {A} = id ,, ((λ _ → =rf) , (λ _ → =rf))
   =id-is-invrt : ∀ {A} {f : A → A} → (∀ a → f a == a) → is-invrt f

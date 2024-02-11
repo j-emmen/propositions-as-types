@@ -195,16 +195,23 @@ module Basic-Inductives where
     tcrfl : ∀ M → refl-trans-clos R M M
     tccnc : ∀ {M N L} → refl-trans-clos R M N → R N L → refl-trans-clos R M L
 
-  -- the refl-trans closure is transitive
-  rtclos-trans : {A : Set}(R : A → A → Set){M N L : A}
-                    → refl-trans-clos R M N → refl-trans-clos R N L → refl-trans-clos R M L
-  rtclos-trans R {M} {N} red₁ (tcrfl N) = red₁
-  rtclos-trans R red₁ (tccnc red₂ stp) = tccnc (rtclos-trans R red₁ red₂) stp
 
   -- it contains the orignal relation
   rtclos-in : {A : Set}(R : A → A → Set){M N : A}
                     → R M N → refl-trans-clos R M N
   rtclos-in R {M} r  = tccnc (tcrfl M) r
+
+  -- t composes also to the left
+  tccnc' : ∀ {A : Set}(R : A → A → Set){M N L}
+             → refl-trans-clos R N L → R M N → refl-trans-clos R M L
+  tccnc' {A} R {M} {N} {N} (tcrfl N) RMN = rtclos-in R RMN
+  tccnc' {A} R {M} {N} {L} (tccnc clRNL r) RMN = tccnc (tccnc' R clRNL RMN) r
+  
+  -- the refl-trans closure is transitive
+  rtclos-trans : {A : Set}(R : A → A → Set){M N L : A}
+                    → refl-trans-clos R M N → refl-trans-clos R N L → refl-trans-clos R M L
+  rtclos-trans R {M} {N} red₁ (tcrfl N) = red₁
+  rtclos-trans R red₁ (tccnc red₂ stp) = tccnc (rtclos-trans R red₁ red₂) stp
 
   -- and it is the minimal such
   rtclos-min : {A : Set}(R S : A → A → Set)
