@@ -17,51 +17,6 @@ module IPL-implic-frag (A : Set) where
     →E : ∀ {Δ P Q} → Δ ⊢ P ⊃ Q → Δ ⊢ P → Δ ⊢ Q
 
 
-  -- premises up to the order of formulas (= multi-sets)
-  infix 15 _≡_ _≡⋆_
-  data _≡_ : Prem → Prem → Set where
-    ≡[] : [] ≡ []
-    ≡cnc : ∀ {Δ Δ'} P → Δ ≡ Δ' → P ∣ Δ ≡ P ∣ Δ'
-    ≡swp : ∀ {Δ Δ'} P Q → Δ ≡ Δ' → P ∣ Q ∣ Δ ≡ Q ∣ P ∣ Δ'
-
-  ≡rfl : ∀ {Δ} → Δ ≡ Δ
-  ≡rfl {[]} = ≡[]
-  ≡rfl {P ∣ Δ} = ≡cnc P ≡rfl
-  
-  _≡⋆_ : Prem → Prem → Set
-  _≡⋆_ = trans-clos _≡_
-  ≡⋆rfl : ∀ {Δ} → Δ ≡⋆ Δ
-  ≡⋆rfl {Δ} = tcin ≡rfl
-  ≡⋆cnc : ∀ {Δ Ξ Θ} → Δ ≡⋆ Ξ → Ξ ≡ Θ → Δ ≡⋆ Θ
-  ≡⋆cnc = tccnc
-  ≡⋆in : ∀ {Δ Ξ} → Δ ≡ Ξ  → Δ ≡⋆ Ξ
-  ≡⋆in = tcin
-  ≡⋆tr : ∀ {Δ Ξ Θ} → Δ ≡⋆ Ξ → Ξ ≡⋆ Θ → Δ ≡⋆ Θ
-  ≡⋆tr = trnclos-trans _≡_
-
-  ≡⋆ext : ∀ {Δ Ξ} P → Δ ≡⋆ Ξ → P ∣ Δ ≡⋆ P ∣ Ξ
-  ≡⋆ext P (tcin eqv) =                   ≡⋆in (≡cnc P eqv)
-  ≡⋆ext P (tccnc {Δ} {Δ'}  ch eqv) =     ≡⋆cnc (≡⋆ext P ch) (≡cnc P eqv)  
-
-  ≡swpcnc : ∀ {Δ Δ' P Q} → Δ ≡ Q ∣ Δ' → P ∣ Δ ≡⋆ Q ∣ P ∣ Δ'
-  ≡swpcnc {P = P} {Q} (≡cnc Q eqv) =  tcin (≡swp P Q eqv)
-  ≡swpcnc {P = P} (≡swp R Q eqv) =    tccnc (tcin (≡cnc P (≡swp R Q ≡rfl))) (≡swp P Q (≡cnc R eqv))
-
-  ≡⋆swpcnc : ∀ {Δ Δ' P Q} → Δ ≡⋆ Q ∣ Δ' → P ∣ Δ ≡⋆ Q ∣ P ∣ Δ'
-  ≡⋆swpcnc {P = P} {Q} (tcin eqv) =               ≡swpcnc eqv
-  ≡⋆swpcnc {P = P} {Q} (tccnc {Δ} {Ξ} ch eqv) =   ≡⋆tr (≡⋆ext P ch) (≡swpcnc eqv)
-
-  ≡-∋ : ∀ {Δ Δ' P} → Δ ≡ Δ' → Δ ∋ P → Δ' ∋ P
-  ≡-∋ (≡cnc P eqv) here = here
-  ≡-∋ (≡cnc R eqv) (there inp) = there (≡-∋ eqv inp)
-  ≡-∋ (≡swp P Q eqv) here = there here
-  ≡-∋ (≡swp R P eqv) (there here) = here
-  ≡-∋ (≡swp R Q eqv) (there (there inp)) = there (there (≡-∋ eqv inp))
-
-  ≡⋆-∋ : ∀ {Δ Δ' P} → Δ ≡⋆ Δ' → Δ ∋ P → Δ' ∋ P
-  ≡⋆-∋ (tcin eqv) inp = ≡-∋ eqv inp
-  ≡⋆-∋ (tccnc {Δ} {Ξ} ch eqv) inp = ≡-∋ eqv (≡⋆-∋ ch inp)
-
   -- the order of premises in a derivation does not matter
   ≡-congr-⊢ : ∀ {Δ Δ' P} → Δ ≡ Δ' → Δ ⊢ P → Δ' ⊢ P
   ≡-congr-⊢ eqv (Ass PinΔ) = Ass (≡-∋ eqv PinΔ)
