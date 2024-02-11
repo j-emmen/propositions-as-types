@@ -1,7 +1,6 @@
 {-# OPTIONS --without-K #-}
 
 module simpleTT (Atm : Set) where
-  open import Nat-and-Fin public
   open import Lambda-Calculus public
 
   ----------------

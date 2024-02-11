@@ -1,7 +1,8 @@
 {-# OPTIONS --without-K #-}
 
 module Lambda-Calculus where
-  open import Nat-and-Fin
+  open import Nat-and-Fin public
+  open import Basic-Relations renaming (Sink to SinkRel)
 
 -- Lambda Terms in De Bruijn notation
 -- a variable var i is bound by the i-th closest abstraction if any
@@ -776,58 +777,58 @@ module Lambda-Calculus where
 
   Sink : (R : {n : Nat} → Trm n → Trm n → Set)
                → ∀ {n} → (N L : Trm n) → Set
-  Sink R {n} N L = Σ[ Trm n ] (λ x → R N x × R L x)
+  Sink R {n} = SinkRel {Trm n} (R {n})
 
   ⋄trm : (R : {n : Nat} → Trm n → Trm n → Set)
             → {n : Nat} → {N L : Trm n} → Sink R N L → Trm n
-  ⋄trm R = pj1
+  ⋄trm R {n} = ⋄vtx (R {n})
   ⋄red₁ : (R : {n : Nat} → Trm n → Trm n → Set)
              → {n : Nat} → {N L : Trm n} → (snk : Sink R N L)
                → R N (⋄trm R snk)
-  ⋄red₁ R snk = prj1 (pj2 snk)
+  ⋄red₁ R {n} = ⋄rel₁ (R {n})
   ⋄red₂ : (R : {n : Nat} → Trm n → Trm n → Set)
              → {n : Nat} → {N L : Trm n} → (snk : Sink R N L)
                → R L (⋄trm R snk)
-  ⋄red₂ R snk = prj2 (pj2 snk)
-  opsink : (R : {n : Nat} → Trm n → Trm n → Set){n : Nat}{N L : Trm n}
-              → Sink R N L → Sink R L N
-  opsink R snk = ⋄trm R snk ,, (⋄red₂ R snk , ⋄red₁ R snk)
-  sink-fun : {R S : ∀ {n} → Trm n → Trm n → Set}
-                → (∀ {n M N} → R {n} M N → S M N)
-                  → ∀ {n M N} →  Sink R {n} M N → Sink S M N
-  sink-fun {R} {S} pf snkR = ⋄trm R snkR ,, (pf (⋄red₁ R snkR)  , pf (⋄red₂ R snkR))
+  ⋄red₂ R {n} = ⋄rel₂ (R {n})
+  --opsink : (R : {n : Nat} → Trm n → Trm n → Set){n : Nat}{N L : Trm n}
+              --→ Sink R N L → Sink R L N
+  --opsink R snk = ⋄trm R snk ,, (⋄red₂ R snk , ⋄red₁ R snk)
+  --sink-fun : {R S : ∀ {n} → Trm n → Trm n → Set}
+                --→ (∀ {n M N} → R {n} M N → S M N)
+                  --→ ∀ {n M N} →  Sink R {n} M N → Sink S M N
+  --sink-fun {R} {S} pf snkR = ⋄trm R snkR ,, (pf (⋄red₁ R snkR)  , pf (⋄red₂ R snkR))
 
 
-  diamond-prop : (R : {n : Nat} → Trm n → Trm n → Set) → Set
-  diamond-prop R = ∀ {n} {M} {N} {L} → R M N → R M L → Sink R {n} N L
-
+  --diamond-prop : (R : {n : Nat} → Trm n → Trm n → Set) → Set
+  --diamond-prop R = ∀ {n} {M} {N} {L} → R M N → R M L → Sink R {n} N L
+{-
 
   -- the transitive closure preserves the diamond property
   
   rtclosure-diamond-aux : (R : {n : Nat} → Trm n → Trm n → Set)
-                             → diamond-prop R → ∀ {n M N L} → refl-trans-clos R M N → R M L
-                               → Σ[ Trm n ] (λ x → R N x × refl-trans-clos R L x)
-  rtclosure-diamond-aux R diam {N = M} {L} (tcrfl M) r =
-    L ,, (r , tcrfl L)
-  rtclosure-diamond-aux R diam {N = N} {L} (tccnc {M} {N'} red r') r =
-    ⋄trm R snkR ,, (⋄red₁ R snkR , tccnc (prj2 (pj2 snk)) (⋄red₂ R snkR))
-    where snk : Σ[ Trm _ ] (λ x → R N' x × refl-trans-clos R L x)
+                             → diamond-prop R → ∀ {n M N L} → refl-trans-closure R M N → R M L
+                               → Σ[ Trm n ] (λ x → R N x × refl-trans-closure R L x)
+  rtclosure-diamond-aux R diam {N = M} {L} (rtcl-rfl M) r =
+    L ,, (r , rtcl-rfl L)
+  rtclosure-diamond-aux R diam {N = N} {L} (rtcl-cnc {M} {N'} r' red) r =
+    ⋄trm R snkR ,, (⋄red₁ R snkR , rtcl-cnc (prj2 (pj2 snk)) (⋄red₂ R snkR))
+    where snk : Σ[ Trm _ ] (λ x → R N' x × refl-trans-closure R L x)
           snk = rtclosure-diamond-aux R diam red r 
           snkR : Sink R N (pj1 snk)
           snkR = diam r' (prj1 (pj2 snk))
 
   rtclosure-diamond : (R : {n : Nat} → Trm n → Trm n → Set)
-                         → diamond-prop R → diamond-prop (refl-trans-clos R)
-  rtclosure-diamond R diam {_} {M} {N} {M} red₁ (tcrfl M) =
-    N ,, (tcrfl N , red₁)
-  rtclosure-diamond R diam {_} {M} {N} {L} red₁ (tccnc {M} {N'} red₂ r) =
-    pj1 snk2 ,, (tccnc {N = pj1 snk1} (⋄red₁ (refl-trans-clos R) snk1) (prj1 (pj2 snk2))
+                         → diamond-prop R → diamond-prop (refl-trans-closure R)
+  rtclosure-diamond R diam {_} {M} {N} {M} red₁ (rtcl-rfl M) =
+    N ,, (rtcl-rfl N , red₁)
+  rtclosure-diamond R diam {_} {M} {N} {L} red₁ (rtcl-cnc {M} {N'} red₂ r) =
+    pj1 snk2 ,, (rtcl-cnc {N = pj1 snk1} (⋄red₁ (refl-trans-closure R) snk1) (prj1 (pj2 snk2))
                 , prj2 (pj2 snk2))
-    where snk1 : Sink (refl-trans-clos R) N N'
+    where snk1 : Sink (refl-trans-closure R) N N'
           snk1 = rtclosure-diamond R diam red₁ red₂
-          snk2 : Σ[ Trm _ ] (λ x → R (pj1 snk1) x × refl-trans-clos R L x)
+          snk2 : Σ[ Trm _ ] (λ x → R (pj1 snk1) x × refl-trans-closure R L x)
           snk2 = rtclosure-diamond-aux R diam (prj2 (pj2 snk1)) r
-
+-}
 
 
   -----------------------
@@ -835,7 +836,7 @@ module Lambda-Calculus where
   -----------------------
 
   -- the one-step reduction relation
-  infix 10 _⟶_ _⟶⋆_
+  infix 10 _⟶_ _⟶⋆_ _≡β_
   data _⟶_ {n : Nat} : Trm n → Trm n → Set where
     β :  ∀ M N → (app (lam M) N) ⟶ (subst-0 M N)
     βlam : ∀ {M N} → M ⟶ N → (lam M) ⟶ (lam N)
@@ -844,17 +845,21 @@ module Lambda-Calculus where
 
   -- reflexive and transitive closure of the one-step reduction relation
   _⟶⋆_ :  {n : Nat} → Trm n → Trm n → Set
-  _⟶⋆_ = refl-trans-clos _⟶_
+  _⟶⋆_ = refl-trans-closure _⟶_
   ⟶⋆rfl : ∀ {n} → (M : Trm n) → M ⟶⋆ M
-  ⟶⋆rfl = tcrfl
-  ⟶⋆cnc : ∀ {n} → {M N L : Trm n} → M ⟶⋆ N → N ⟶ L → M ⟶⋆ L
-  ⟶⋆cnc = tccnc
-  ⟶⋆cnc' : ∀ {n} → {M N L : Trm n} → N ⟶⋆ L → M ⟶ N → M ⟶⋆ L
-  ⟶⋆cnc' = tccnc' _⟶_
+  ⟶⋆rfl = rtcl-rfl
+  ⟶⋆cnc : ∀ {n} → {M N L : Trm n} → M ⟶ N → N ⟶⋆ L → M ⟶⋆ L
+  ⟶⋆cnc = rtcl-cnc
+  ⟶⋆cnc' : ∀ {n} → {M N L : Trm n} → M ⟶⋆ N → N ⟶ L → M ⟶⋆ L
+  ⟶⋆cnc' = rtcl-cnc' _⟶_
   ⟶⋆in : {n : Nat}{M N : Trm n} → M ⟶ N  → M ⟶⋆ N
-  ⟶⋆in = rtclos-in _⟶_
+  ⟶⋆in = rtcl-in _⟶_
   ⟶⋆tr : {n : Nat}{M N L : Trm n} → M ⟶⋆ N → N ⟶⋆ L → M ⟶⋆ L
-  ⟶⋆tr = rtclos-trans _⟶_
+  ⟶⋆tr = rtcl-trans _⟶_
+
+  -- β-equivalence
+  _≡β_ : ∀ {n} → Trm n → Trm n → Set
+  _≡β_ = rst-closure _⟶_
 
   -- the parallel reduction relation
   infix 10 _≡>_ _≡>⋆_
@@ -866,15 +871,17 @@ module Lambda-Calculus where
 
   -- and its reflexive and transitive closure
   _≡>⋆_ : {n : Nat} → Trm n → Trm n → Set
-  _≡>⋆_ = refl-trans-clos _≡>_
+  _≡>⋆_ = refl-trans-closure _≡>_
   ≡>⋆rfl : ∀ {n} → (M : Trm n) → M ≡>⋆ M
-  ≡>⋆rfl = tcrfl
-  ≡>⋆cnc : ∀ {n} → {M N L : Trm n} → M ≡>⋆ N → N ≡> L → M ≡>⋆ L
-  ≡>⋆cnc = tccnc
+  ≡>⋆rfl = rtcl-rfl
+  ≡>⋆cnc : ∀ {n} → {M N L : Trm n} → M ≡> N → N ≡>⋆ L → M ≡>⋆ L
+  ≡>⋆cnc = rtcl-cnc
+  ≡>⋆cnc' : ∀ {n} → {M N L : Trm n} → M ≡>⋆ N → N ≡> L → M ≡>⋆ L
+  ≡>⋆cnc' = rtcl-cnc' _≡>_
   ≡>⋆in : {n : Nat}{M N : Trm n} → M ≡> N  → M ≡>⋆ N
-  ≡>⋆in = rtclos-in _≡>_
+  ≡>⋆in = rtcl-in _≡>_
   ≡>⋆tr : {n : Nat}{M N L : Trm n} → M ≡>⋆ N → N ≡>⋆ L → M ≡>⋆ L
-  ≡>⋆tr = rtclos-trans _≡>_
+  ≡>⋆tr = rtcl-trans _≡>_
 
   -- variables do not reduce
   ¬var⟶ : ∀ {n i M} → ¬ (var {n} i ⟶ M)
@@ -1297,12 +1304,12 @@ module Lambda-Calculus where
 
   -- Some congruences of ⟶⋆
   ⟶⋆-lam : {n : Nat}{M M' : Trm (suc n)} → M ⟶⋆ M' → lam M ⟶⋆ lam M'
-  ⟶⋆-lam (tcrfl M) = ⟶⋆rfl (lam M)
-  ⟶⋆-lam (tccnc red stp) = ⟶⋆cnc (⟶⋆-lam red) (βlam stp)
+  ⟶⋆-lam (rtcl-rfl M) = ⟶⋆rfl (lam M)
+  ⟶⋆-lam (rtcl-cnc stp red) = ⟶⋆cnc (βlam stp) (⟶⋆-lam red)
   ⟶⋆-app : {n : Nat}{M M' N N' : Trm n} → M ⟶⋆ M' → N ⟶⋆ N' → app M N ⟶⋆ app M' N'
-  ⟶⋆-app (tcrfl M) (tcrfl N) = ⟶⋆rfl (app M N)
-  ⟶⋆-app (tcrfl M) (tccnc redN stpN) = ⟶⋆tr (⟶⋆-app (⟶⋆rfl M) redN) (⟶⋆in (βappᵣ stpN))
-  ⟶⋆-app (tccnc redM stpM) redN = ⟶⋆tr (⟶⋆-app redM redN) (⟶⋆in (βappₗ stpM))
+  ⟶⋆-app (rtcl-rfl M) (rtcl-rfl N) = ⟶⋆rfl (app M N)
+  ⟶⋆-app (rtcl-rfl M) (rtcl-cnc stpN redN) = ⟶⋆cnc (βappᵣ stpN) (⟶⋆-app (⟶⋆rfl M) redN)
+  ⟶⋆-app (rtcl-cnc stpM redM) redN = ⟶⋆cnc (βappₗ stpM) (⟶⋆-app redM redN)
 
   ⟶⋆-trmsect : {n : Nat}{N N' : Trm n} → N ⟶⋆ N'
                 → ∀ i → trmsect N i ⟶⋆ trmsect N' i
@@ -1311,9 +1318,9 @@ module Lambda-Calculus where
 
   ⟶⋆-rename : {n m : Nat}{M M' : Trm n}(f : Fin n → Fin m)
                  → M ⟶⋆ M' → rename M f ⟶⋆ rename M' f
-  ⟶⋆-rename {M = M} {M} f (tcrfl M) =
+  ⟶⋆-rename {M = M} {M} f (rtcl-rfl M) =
     ⟶⋆rfl (rename M f)
-  ⟶⋆-rename {M = M} {N} f (tccnc red stp) = tccnc (⟶⋆-rename f red) (⟶-rename f stp)
+  ⟶⋆-rename {M = M} {N} f (rtcl-cnc stp red) = rtcl-cnc (⟶-rename f stp) (⟶⋆-rename f red)
 
   ⟶⋆-ext : {n : Nat}{M M' : Trm n}
               → M ⟶⋆ M' → ext M ⟶⋆ ext M'
@@ -1338,11 +1345,10 @@ module Lambda-Calculus where
   ⟶⋆-subst-all : {n m : Nat}{M M' : Trm n}{f f' : Fin n → Trm m}
                     → M ⟶⋆ M' → (∀ i → f i ⟶⋆ f' i)
                       → subst-all M f ⟶⋆ subst-all M' f'
-  ⟶⋆-subst-all {M = M} {f = f} {f'} (tcrfl M) redf =
+  ⟶⋆-subst-all {M = M} {f = f} {f'} (rtcl-rfl M) redf =
     ⟶⋆-subst-allᵣ M redf 
-  ⟶⋆-subst-all {M = M} {f = f} {f'} (tccnc redM stpM) redf =
-    ⟶⋆cnc (⟶⋆-subst-all redM redf) (⟶-subst-all f' stpM)
-
+  ⟶⋆-subst-all {M = M} {f = f} {f'} (rtcl-cnc stpM redM) redf =
+    ⟶⋆cnc (⟶-subst-all f stpM) (⟶⋆-subst-all redM redf)
 
   ⟶⋆-subst-0 : {n : Nat}{M M' : Trm (suc n)}{N N' : Trm n} → M ⟶⋆ M' → N ⟶⋆ N'
                     → subst-0 M N ⟶⋆ subst-0 M' N'
@@ -1470,9 +1476,9 @@ module Lambda-Calculus where
 
   -- ⟶⋆ and ≡>⋆ are the same relation
   ≡>⋆<⟶⋆ : {n : Nat}{M N : Trm n} → M ≡>⋆ N → M ⟶⋆ N
-  ≡>⋆<⟶⋆ = rtclos-min _≡>_ _⟶⋆_ (λ {M} → ⟶⋆rfl M) ⟶⋆tr ≡><⟶⋆
+  ≡>⋆<⟶⋆ = rtcl-min {R = _≡>_} {_⟶⋆_} ⟶⋆rfl ⟶⋆tr ≡><⟶⋆
   ⟶⋆<≡>⋆ : {n : Nat}{M N : Trm n} → M ⟶⋆ N → M ≡>⋆ N
-  ⟶⋆<≡>⋆ = rtclos-fun (λ M N → ⟶<≡> {M = M} {N})
+  ⟶⋆<≡>⋆ = rtcl-fun ⟶<≡>
 
 
   -- proof that the parallel reduction relation ≡> has the diamond property
@@ -1519,7 +1525,7 @@ module Lambda-Calculus where
   
 
   -- ≡> has the diamond property
-  ≡>-has-diamond : diamond-prop _≡>_
+  ≡>-has-diamond : ∀ {n} → diamond-prop (_≡>_ {n})
   -- by induction on the left ≡>-reduction
   -- rfl
   ≡>-has-diamond {_} {M} {_} {L}  ≡>rfl red =
@@ -1559,21 +1565,21 @@ module Lambda-Calculus where
           M₂-snk = ≡>-has-diamond red₁₂ red₂₂
 
   -- ≡>⋆ has the diamond property
-  ≡>⋆-has-diamond : diamond-prop _≡>⋆_
+  ≡>⋆-has-diamond : ∀ {n} → diamond-prop (_≡>⋆_ {n})
   ≡>⋆-has-diamond = rtclosure-diamond _≡>_ ≡>-has-diamond
 
 
   -------------------------
   -- Church-Rosser Theorem
   -------------------------
-  Church-Rosser :  diamond-prop _⟶⋆_
-  Church-Rosser {M = M} {N} {L} red₁ red₂ =
+  Church-Rosser : ∀ {n} → diamond-prop (_⟶⋆_ {n})
+  Church-Rosser {n} {M} {N} {L} red₁ red₂ =
     pj1 ≡>⋆snk ,, (≡>⋆<⟶⋆ (prj1 (pj2 ≡>⋆snk)) , ≡>⋆<⟶⋆ (prj2 (pj2 ≡>⋆snk)))
     where ≡>⋆snk : Sink _≡>⋆_ N L
           ≡>⋆snk = ≡>⋆-has-diamond (⟶⋆<≡>⋆ red₁) (⟶⋆<≡>⋆ red₂)
 
   ----------------
-  -- normal forms
+  -- Normal Forms
   ----------------
 
   is-normal : ∀ {n} → Trm n → Set
@@ -1867,8 +1873,8 @@ module Lambda-Calculus where
   normal-form-of {n} {M} {suc lM} (strnrm-stp Msns) =
     [ (λ Mnrm → M ,, (Mnrm , ⟶⋆rfl M))
     ∣ (λ MM → pj1 (normal-form-of (Msns (pj2 MM)))
-              ,, (prj1 (pj2 (normal-form-of (Msns (pj2 MM))))
-                 , ⟶⋆cnc' (prj2 (pj2 (normal-form-of (Msns (pj2 MM))))) (pj2 MM)))
+              ,, ( prj1 (pj2 (normal-form-of (Msns (pj2 MM))))
+                 , ⟶⋆cnc  (pj2 MM) (prj2 (pj2 (normal-form-of (Msns (pj2 MM))))) ))
     ] (⟶cases M)
           
 

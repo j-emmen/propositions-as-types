@@ -69,10 +69,10 @@ module Basic-Relations where
     trnS (inS r) (rtcl-min rflS trnS inS red)
 
   -- it is also functorial
-  rtclos-fun : {A : Set}{R S : A → A → Set}
+  rtcl-fun : {A : Set}{R S : A → A → Set}
                   → (∀ {M N} → R M N → S M N)
                     → ∀ {M N} → refl-trans-closure R M N → refl-trans-closure S M N
-  rtclos-fun {_} {_} {S} RtoS = rtcl-min rtcl-rfl (rtcl-trans S) (rtcl-in S ∘ RtoS)
+  rtcl-fun {_} {_} {S} RtoS = rtcl-min rtcl-rfl (rtcl-trans S) (rtcl-in S ∘ RtoS)
 
 
   -- the symmetric closure
@@ -214,5 +214,66 @@ module Basic-Relations where
   ≡⋆-∋ : {A : Set} → {α α' : List A} → {a : A} → α ≡⋆ α' → α ∋ a → α' ∋ a
   ≡⋆-∋ (tcl-in eqv) inp = ≡-∋ eqv inp
   ≡⋆-∋ (tcl-cnc {α} {β} eqv cl) inp = ≡⋆-∋ cl (≡-∋ eqv inp)
+
+
+
+  --------------------
+  -- Diamond property
+  --------------------
+
+  Sink : {A : Set} (R : A → A → Set)
+               → A → A → Set
+  Sink {A} R a a' = Σ[ A ] (λ x → R a x × R a' x)
+
+  ⋄vtx : {A : Set} (R : A → A → Set)
+            → {a a' : A} → Sink R a a' → A
+  ⋄vtx R = pj1
+  ⋄rel₁ : {A : Set} (R : A → A → Set)
+             → {a a' : A} → (snk : Sink R a a')
+               → R a (⋄vtx R snk)
+  ⋄rel₁ R snk = prj1 (pj2 snk)
+  ⋄rel₂ : {A : Set} (R : A → A → Set)
+             → {a a' : A} → (snk : Sink R a a')
+               → R a' (⋄vtx R snk)
+  ⋄rel₂ R snk = prj2 (pj2 snk)
+  opsink : {A : Set} (R : A → A → Set){a a' : A}
+              → Sink R a a' → Sink R a' a
+  opsink R snk = ⋄vtx R snk ,, (⋄rel₂ R snk , ⋄rel₁ R snk)
+  sink-fun : {A : Set} {R S : A → A → Set}
+                → (∀ {a a'} → R a a' → S a a')
+                  → ∀ {a a'} →  Sink R a a' → Sink S a a'
+  sink-fun {_} {R} {S} pf snkR = ⋄vtx R snkR ,, (pf (⋄rel₁ R snkR)  , pf (⋄rel₂ R snkR))
+
+
+  diamond-prop : {A : Set} (R : A → A → Set) → Set
+  diamond-prop R = ∀ {a b c} → R a b → R a c → Sink R b c
+
+
+  -- the transitive closure preserves the diamond property
+  
+  rtclosure-diamond-aux : {A : Set} (R : A → A → Set)
+                             → diamond-prop R → ∀ {a b c} → refl-trans-closure R a b → R a c
+                               → Σ[ A ] (λ x → R b x × refl-trans-closure R c x)
+  rtclosure-diamond-aux R diam {b = a} {c} (rtcl-rfl a) r =
+    c ,, (r , rtcl-rfl c)
+  rtclosure-diamond-aux R diam {b = b} {c} (rtcl-cnc {a} {b'} ab' b'b) ac =
+    pj1 snk2 ,, ( prj1 (pj2 snk2) , rtcl-cnc (prj2 (pj2 snk1)) (prj2 (pj2 snk2)) )
+    where snk1 : Sink R b' c
+          snk1 = diam ab' ac
+          snk2 : Σ[ _ ] (λ x → R b x × refl-trans-closure R (pj1 snk1) x)
+          snk2 = rtclosure-diamond-aux R diam b'b (prj1 (pj2 snk1))
+
+  rtclosure-diamond : {A : Set} (R : A → A → Set)
+                         → diamond-prop R → diamond-prop (refl-trans-closure R)
+  rtclosure-diamond R diam {a} {b} {a} ab (rtcl-rfl a) =
+    b ,, (rtcl-rfl b , ab)
+  rtclosure-diamond R diam {a} {b} {c} ab (rtcl-cnc {a} {b'} ab' b'c) =
+    ⋄vtx (refl-trans-closure R) snk2
+    ,, ( rtcl-cnc (prj1 (pj2 snk1)) (prj1 (pj2 snk2))
+       , prj2 (pj2 snk2) )
+    where snk1 : Σ[ _ ] (λ x → R b x × refl-trans-closure R b' x)
+          snk1 = rtclosure-diamond-aux R diam ab ab'
+          snk2 : Sink (refl-trans-closure R) (pj1 snk1) c
+          snk2 = rtclosure-diamond R diam (prj2 (pj2 snk1)) b'c
 
 -- end of file
