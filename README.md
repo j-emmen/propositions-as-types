@@ -1,10 +1,7 @@
 ## Propositions as Types
 
-Actually the project currently contains more about lambda calculus and simple type theory than about logic.
+Currently, the working part of the project is that on lambda calculus and simple type theory. The logic part needs to be updated (it used to work).
 
-**Currently the files IPL-implic-frag.agda and props-as-types.agda do not compile**.
-
-Currently only the implicational fragment is considered.
 
 Lambda-calculus.agda defines lambda terms (currently `var`, `lam`, and `app`) and substitution, the reducibility relations, normal and stringly normalising terms, and it contains:
 1. inverses to one step reduction rules,
